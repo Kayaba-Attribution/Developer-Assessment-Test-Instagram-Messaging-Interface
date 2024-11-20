@@ -86,14 +86,14 @@ class SessionService {
     try {
       const users = await this.getCollection();
       const user = await users.findOne(
-        { instagram_username: username },
-        { projection: { instagram_username: 1, instagram_password: 1 } }
+        { instagram_username: username }
       );
 
       return user
         ? {
             username: user.instagram_username,
             password: user.instagram_password,
+            session: user.session,
           }
         : null;
     } catch (error) {
@@ -119,7 +119,6 @@ class SessionService {
       });
 
       user.lastActivity = new Date();
-      await user.save();
 
       return user.messages[user.messages.length - 1];
     } catch (error) {

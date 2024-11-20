@@ -2,6 +2,7 @@
 require("dotenv").config();
 const express = require("express");
 const fs = require("fs").promises;
+const cors = require("cors");
 const logger = require("./utils/logger");
 const cleanup = require("./utils/cleanup");
 const {
@@ -15,6 +16,8 @@ const sessionService = require("./services/sessionService");
 
 const app = express();
 app.use(express.json());
+// Simple CORS setup for development
+app.use(cors());
 
 // Initialize app
 async function initialize() {
@@ -163,6 +166,8 @@ app.post("/api/messages/send", async (req, res) => {
     const credentials = await sessionService.getStoredCredentials(
       from_username
     );
+    logger.info(`Loaded credentials for ${from_username}`);
+    logger.info(JSON.stringify(credentials));
     if (!credentials?.session) {
       await sessionService.logMessage(
         from_username,
@@ -181,7 +186,7 @@ app.post("/api/messages/send", async (req, res) => {
     const result = await navigateAndSendMessage(
       username,
       content,
-      user.session
+      credentials.session
     );
 
     if (result.success) {
