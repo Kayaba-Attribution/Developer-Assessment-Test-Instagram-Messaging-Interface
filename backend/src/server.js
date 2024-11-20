@@ -235,6 +235,121 @@ app.get("/api/messages/history/:username", async (req, res) => {
   }
 });
 
+// Get all messages for a user
+app.get("/api/messages/:username", async (req, res) => {
+  try {
+    const { username } = req.params;
+    const {
+      page = 1,
+      limit = 50,
+      status,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
+
+    // Find user and their messages
+    const user = await User.findOne(
+      { instagram_username: username },
+      {
+        messages: {
+          $slice: [(page - 1) * limit, Number(limit)],
+        },
+        _id: 0,
+      }
+    ).lean();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    // Get total count for pagination
+    const totalMessages = await User.aggregate([
+      { $match: { instagram_username: username } },
+      { $project: { count: { $size: "$messages" } } },
+    ]);
+
+    const total = totalMessages[0]?.count || 0;
+
+    // Filter messages if status is provided
+    let messages = user.messages || [];
+    if (status) {
+      messages = messages.filter((msg) => msg.status === status);
+    }
+
+    // Sort messages
+    messages.sort((a, b) => {
+      const sortMultiplier = sortOrder === "desc" ? -1 : 1;
+      return sortMultiplier * (new Date(a[sortBy]) - new Date(b[sortBy]));
+    });
+
+    res.json({
+      success: true,
+      data: {
+        messages,
+        pagination: {
+          total,
+          page: Number(page),
+          totalPages: Math.ceil(total / limit),
+          hasMore: page * limit < total,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error("Error fetching messages:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch messages",
+    });
+  }
+});
+
+// Get message statistics for a user
+app.get("/api/messages/:username/stats", async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const stats = await User.aggregate([
+      { $match: { instagram_username: username } },
+      { $unwind: "$messages" },
+      {
+        $group: {
+          _id: "$messages.status",
+          count: { $sum: 1 },
+          recipients: { $addToSet: "$messages.recipient" },
+        },
+      },
+    ]);
+
+    const formattedStats = {
+      total: stats.reduce((acc, curr) => acc + curr.count, 0),
+      byStatus: stats.reduce(
+        (acc, curr) => ({
+          ...acc,
+          [curr._id]: {
+            count: curr.count,
+            uniqueRecipients: curr.recipients.length,
+          },
+        }),
+        {}
+      ),
+    };
+
+    res.json({
+      success: true,
+      data: formattedStats,
+    });
+  } catch (error) {
+    logger.error("Error fetching message stats:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch message statistics",
+    });
+  }
+});
+
 // Graceful shutdown
 process.on("SIGINT", async () => {
   try {
