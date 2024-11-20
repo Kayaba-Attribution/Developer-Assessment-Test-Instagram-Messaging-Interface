@@ -2,7 +2,7 @@
 
 **Login Screen:**
 
-- [ ] Build a login screen in React with fields for:
+- [x] Build a login screen in React with fields for:
 
 - Username
 - Password

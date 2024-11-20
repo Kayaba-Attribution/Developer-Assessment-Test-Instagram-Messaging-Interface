@@ -190,6 +190,7 @@ async function navigateAndSendMessage(username, content, sessionData) {
       headless: config.headless,
       args: config.browserOptions.args,
     });
+    logger.info("Browser launched");
 
     const context = await browser.newContext({
       userAgent:
@@ -225,7 +226,11 @@ async function navigateAndSendMessage(username, content, sessionData) {
       },
     ]);
 
+    logger.info("Session cookies added");
+
     const page = await wrap(await context.newPage());
+
+    logger.info("Navigating to Instagram message page");
 
     // First verify session
     await page.goto("https://www.instagram.com/", {

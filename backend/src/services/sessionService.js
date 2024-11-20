@@ -62,18 +62,13 @@ class SessionService {
       const users = await this.getCollection();
       const user = await users.findOne({ instagram_username: username });
 
-      if (!user || !user.session) return false;
-
-      const isValid = user.session.expiresAt > new Date();
-
-      if (isValid) {
-        // Update last activity if session is valid
-        await users.updateOne(
-          { instagram_username: username },
-          { $set: { lastActivity: new Date() } }
-        );
+      if (!user?.session?.expiresAt) {
+        logger.debug(`No session found for ${username}`);
+        return false;
       }
 
+      const isValid = new Date(user.session.expiresAt) > new Date();
+      logger.debug(`Session validation for ${username}: ${isValid}`);
       return isValid;
     } catch (error) {
       logger.error("Session validation error:", error);
@@ -81,46 +76,62 @@ class SessionService {
     }
   }
 
-  // Get stored credentials for auto-login
   async getStoredCredentials(username) {
     try {
       const users = await this.getCollection();
       const user = await users.findOne(
-        { instagram_username: username }
+        { instagram_username: username },
+        { projection: { session: 1 } }
       );
 
-      return user
-        ? {
-            username: user.instagram_username,
-            password: user.instagram_password,
-            session: user.session,
-          }
-        : null;
+      if (!user?.session) {
+        logger.debug(`No credentials found for ${username}`);
+        return null;
+      }
+
+      const isValid = new Date(user.session.expiresAt) > new Date();
+      if (!isValid) {
+        logger.debug(`Expired session found for ${username}`);
+        return null;
+      }
+
+      return {
+        session: user.session,
+      };
     } catch (error) {
-      logger.error("Get credentials error:", error);
+      logger.error("Error getting stored credentials:", error);
       return null;
     }
   }
 
   async logMessage(fromUsername, recipient, content, status, error = null) {
     try {
-        const users = await this.getCollection();
-        const user = await users.findOne({ instagram_username: fromUsername });
-      if (!user) {
-        throw new Error("User not found");
-      }
+      const users = await this.getCollection();
 
-      user.messages.push({
+      // Create the message object
+      const messageLog = {
         recipient,
         content,
         status,
-        ...(error && { error: error.toString() }),
         createdAt: new Date(),
-      });
+        ...(error && { error: error.toString() }),
+      };
 
-      user.lastActivity = new Date();
+      // Update the document using MongoDB's $push operator
+      const result = await users.updateOne(
+        { instagram_username: fromUsername },
+        {
+          $push: { messages: messageLog },
+          $set: { lastActivity: new Date() },
+        }
+      );
 
-      return user.messages[user.messages.length - 1];
+      if (result.matchedCount === 0) {
+        throw new Error("User not found");
+      }
+
+      logger.info(`Message logged for user ${fromUsername} to ${recipient}`);
+      return messageLog;
     } catch (error) {
       logger.error("Error logging message:", error);
       throw error;

@@ -48,7 +48,6 @@ async function initialize() {
   }
 }
 
-// API Routes
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -61,6 +60,25 @@ app.post("/api/login", async (req, res) => {
     }
 
     logger.info(`Login request received for user: ${username}`);
+
+    // First check if there's a valid session
+    const sessionValid = await sessionService.validateSession(username);
+    if (sessionValid) {
+      const credentials = await sessionService.getStoredCredentials(username);
+      if (credentials?.session) {
+        logger.info(`Valid session found for ${username}`);
+        return res.json({
+          success: true,
+          session: credentials.session,
+          message: "Using existing session",
+        });
+      }
+    }
+
+    // If no valid session exists, proceed with login
+    logger.info(
+      `No valid session found for ${username}, proceeding with login`
+    );
     const result = await instagramLogin(username, password);
 
     if (result.success) {
@@ -70,10 +88,46 @@ app.post("/api/login", async (req, res) => {
         password,
         result.session
       );
-      logger.info("Login successful");
+      logger.info("New login successful");
       res.json(result);
     } else {
       logger.warn("Login failed:", result.error);
+      res.status(401).json(result);
+    }
+  } catch (error) {
+    logger.error("API error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: error.message,
+    });
+  }
+});
+
+app.post("/api/login/force", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        error: "Username and password are required",
+      });
+    }
+
+    logger.info(`Forced login request received for user: ${username}`);
+    const result = await instagramLogin(username, password);
+
+    if (result.success) {
+      await sessionService.createOrUpdateSession(
+        username,
+        password,
+        result.session
+      );
+      logger.info("Forced login successful");
+      res.json(result);
+    } else {
+      logger.warn("Forced login failed:", result.error);
       res.status(401).json(result);
     }
   } catch (error) {
@@ -166,8 +220,7 @@ app.post("/api/messages/send", async (req, res) => {
     const credentials = await sessionService.getStoredCredentials(
       from_username
     );
-    logger.info(`Loaded credentials for ${from_username}`);
-    logger.info(JSON.stringify(credentials));
+    logger.info(`[/api/messages/send] Loaded credentials for ${from_username}`);
     if (!credentials?.session) {
       await sessionService.logMessage(
         from_username,
