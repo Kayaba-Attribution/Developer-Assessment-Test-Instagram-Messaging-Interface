@@ -1,95 +1,28 @@
 // src/services/instagram.js
 const { wrap, configure } = require("agentql");
 const { chromium } = require("playwright");
-const path = require("path");
 const logger = require("../utils/logger");
 const { config, isDev } = require("../config");
 const { QUERIES } = require("../config/constants");
-const fs = require("fs").promises;
+const { takeScreenshot, saveSessionToFile, loadSessionFromFile } = require("../utils/files");
 
-// Function to save session data to file (dev only)
-async function saveSessionToFile(sessionData) {
-  if (isDev) {
-    try {
-      const sessionFile = path.join(
-        __dirname,
-        "../../sessions/saved_session.json"
-      );
-      await fs.writeFile(sessionFile, JSON.stringify(sessionData, null, 2));
-      logger.info("Session data saved to file");
-    } catch (error) {
-      logger.error("Error saving session to file:", error);
-    }
-  }
-}
 
-// Function to load session data from file
-async function loadSessionFromFile() {
-  try {
-    const sessionFile = path.join(
-      __dirname,
-      "../../sessions/saved_session.json"
-    );
-    console.log(sessionFile);
-    const data = await fs.readFile(sessionFile, "utf8");
-    return JSON.parse(data);
-  } catch (error) {
-    logger.error("Error loading session from file:", error);
-    throw new Error("Failed to load session data");
-  }
-}
-
-async function takeScreenshot(page, name) {
-  if (!config.saveScreenshots) return null;
-
-  const screenshotPath = path.join(
-    config.screenshotsDir,
-    `${name}_${Date.now()}.png`
-  );
-  await page.screenshot({ path: screenshotPath, fullPage: true });
-  if (isDev) {
-    logger.info(`Screenshot saved: ${screenshotPath}`);
-  }
-  return screenshotPath;
-}
 
 async function checkForErrors(page) {
-  try {
-    const pageContent = await page.content();
-    const currentUrl = page.url();
-
-    if (isDev) {
-      logger.debug("Current URL:", currentUrl);
-    }
-
-    const errorConditions = {
-      suspicious_login: "Suspicious login detected",
-      challenge_required: "Challenge required",
-      checkpoint_required: "Checkpoint required",
-    };
-
-    for (const [condition, message] of Object.entries(errorConditions)) {
-      if (pageContent.includes(condition)) {
-        logger.error(message);
-        return condition;
-      }
-    }
-
-    if (currentUrl.includes("login")) {
+    try {
       const errorElements = await page.queryElements(QUERIES.ERROR_MESSAGE);
       if (errorElements?.error_message) {
         const errorText = await errorElements.error_message.textContent();
         logger.error("Login error message:", errorText);
         return errorText;
       }
+      return null;
+    } catch (error) {
+      logger.error("Error checking for errors:", error);
+      return "Unknown error occurred";
     }
-
-    return null;
-  } catch (error) {
-    logger.error("Error checking for errors:", error);
-    return "unknown_error";
   }
-}
+  
 
 async function instagramLogin(username, password) {
   let browser;
@@ -152,8 +85,11 @@ async function instagramLogin(username, password) {
 
     const error = await checkForErrors(page);
     if (error) {
-      throw new Error(`Login failed: ${error}`);
-    }
+        return {
+          success: false,
+          error: error
+        };
+      }
 
     const currentUrl = page.url();
     const loginSuccess = !currentUrl.includes("accounts/login");

@@ -22,7 +22,7 @@ Maintain a session state to track whether the user is already logged in. If logg
 *locally
 
 **Login API Specification**
-- [ ] login route creation
+- [x] login route creation
 
 **Send Messages:** 
 Implement routes to process the recipient username and message and send the message via Instagram.

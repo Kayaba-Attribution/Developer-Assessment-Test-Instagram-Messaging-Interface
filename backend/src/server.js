@@ -7,6 +7,7 @@ const cleanup = require("./utils/cleanup");
 const { instagramLogin, loadSavedSession } = require("./services/instagram");
 const { config, NODE_ENV } = require("./config");
 const { DIRECTORIES } = require("./config/constants");
+const { log } = require("console");
 
 const app = express();
 app.use(express.json());
@@ -61,6 +62,7 @@ app.post("/api/login", async (req, res) => {
 // Simple load saved session route
 app.post("/api/session/load", async (req, res) => {
   try {
+    logger.info(`Load session request received`);
     const result = await loadSavedSession();
     res.json(result);
   } catch (error) {
