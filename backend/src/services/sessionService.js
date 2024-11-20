@@ -4,20 +4,23 @@ const db = require("../config/database");
 const logger = require("../utils/logger");
 
 class SessionService {
+  // Get MongoDB collection
   async getCollection() {
     return await db.getCollection("users");
   }
 
+  // Hash passwords before storing
   async hashPassword(password) {
     const salt = await bcrypt.genSalt(10);
     return await bcrypt.hash(password, salt);
   }
 
+  // Core method: Create or update user session
   async createOrUpdateSession(username, password, sessionData) {
     try {
       const users = await this.getCollection();
 
-      // Extract essential cookies
+      // Extract only the essential cookies we need
       const sessionInfo = {
         sessionId: sessionData.cookies.find((c) => c.name === "sessionid")
           ?.value,
@@ -25,13 +28,12 @@ class SessionService {
         csrfToken: sessionData.cookies.find((c) => c.name === "csrftoken")
           ?.value,
         rur: sessionData.cookies.find((c) => c.name === "rur")?.value,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hour expiration
       };
 
-      // Hash password
       const hashedPassword = await this.hashPassword(password);
 
-      // Update or insert user
+      // Update if exists, create if doesn't (upsert)
       const result = await users.findOneAndUpdate(
         { instagram_username: username },
         {
@@ -54,6 +56,7 @@ class SessionService {
     }
   }
 
+  // Check if a session is valid
   async validateSession(username) {
     try {
       const users = await this.getCollection();
@@ -64,6 +67,7 @@ class SessionService {
       const isValid = user.session.expiresAt > new Date();
 
       if (isValid) {
+        // Update last activity if session is valid
         await users.updateOne(
           { instagram_username: username },
           { $set: { lastActivity: new Date() } }
@@ -77,6 +81,7 @@ class SessionService {
     }
   }
 
+  // Get stored credentials for auto-login
   async getStoredCredentials(username) {
     try {
       const users = await this.getCollection();
@@ -94,6 +99,19 @@ class SessionService {
     } catch (error) {
       logger.error("Get credentials error:", error);
       return null;
+    }
+  }
+
+  // Cleanup expired sessions
+  async cleanupExpiredSessions() {
+    try {
+      const users = await this.getCollection();
+      await users.updateMany(
+        { "session.expiresAt": { $lt: new Date() } },
+        { $unset: { session: "" } }
+      );
+    } catch (error) {
+      logger.error("Session cleanup error:", error);
     }
   }
 
