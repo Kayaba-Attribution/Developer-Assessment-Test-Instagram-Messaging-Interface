@@ -17,6 +17,13 @@ After login (or if the user is already logged in) -> display a form with the fol
 
 **_Two Input Modes:_**
 
+Security Issues:
+
+- Storing or transmitting passwords in plaintext is a major security risk
+- Sending unencrypted credentials over the network exposes them to potential interception
+- Having users frequently re-enter credentials increases the risk of keyloggers or shoulder surfing
+- Storing Instagram credentials (even encrypted) could violate Instagram's terms of service
+
 **1. Manual Input:** 
 Allow users to manually fill out the form fields
 - username, password, recipient username, and message
@@ -31,6 +38,8 @@ Configure the UI to accept a JSON input in the following format:
   "recipient": "instagram_user",
   "message": "Hello, this is a test message!"
 }
+
+cool_magazine_taiwan
 ```
 
 When provided with this JSON (e.g., through Postilize), auto-fill the fields, allowing the user to preview or confirm the details before sending the message.

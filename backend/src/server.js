@@ -408,6 +408,152 @@ app.get("/api/messages/:username/stats", async (req, res) => {
   }
 });
 
+// Route to send message with authentication THE ALL-MIGHTY ROUTE
+app.post("/api/messages/send-with-auth", async (req, res) => {
+  try {
+    const { username, password, recipient, message } = req.body;
+
+    // Validate request body
+    if (!username || !password || !recipient || !message) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "All fields are required: username, password, recipient, and message",
+      });
+    }
+
+    logger.info(
+      `Attempting to send message for user: ${username} to: ${recipient}`
+    );
+
+    // Check for existing valid session first
+    const sessionValid = await sessionService.validateSession(username);
+    let sessionData;
+
+    if (!sessionValid) {
+      // No valid session, attempt login
+      logger.info(`No valid session found for ${username}, attempting login`);
+      const loginResult = await instagramLogin(username, password);
+
+      if (!loginResult.success) {
+        logger.warn(`Login failed for ${username}: ${loginResult.error}`);
+        return res.status(401).json({
+          success: false,
+          error: loginResult.error || "Authentication failed",
+        });
+      }
+
+      // Store new session
+      sessionData = loginResult.session;
+      await sessionService.createOrUpdateSession(
+        username,
+        password,
+        sessionData
+      );
+      logger.info(`New session created for ${username}`);
+    } else {
+      // Use existing session
+      logger.info(`Using existing session for ${username}`);
+      const credentials = await sessionService.getStoredCredentials(username);
+      sessionData = credentials?.session;
+
+      if (!sessionData) {
+        // Edge case: session marked valid but data missing
+        logger.warn(`Session marked valid but no data found for ${username}`);
+        const loginResult = await instagramLogin(username, password);
+
+        if (!loginResult.success) {
+          return res.status(401).json({
+            success: false,
+            error: loginResult.error || "Authentication failed",
+          });
+        }
+
+        sessionData = loginResult.session;
+        await sessionService.createOrUpdateSession(
+          username,
+          password,
+          sessionData
+        );
+      }
+    }
+
+    // Attempt to send the message using the session
+    const messageResult = await navigateAndSendMessage(
+      recipient,
+      message,
+      sessionData
+    );
+
+    if (messageResult.success) {
+      // Log successful message
+      await sessionService.logMessage(username, recipient, message, "sent");
+      logger.info(`Successfully sent message from ${username} to ${recipient}`);
+
+      res.json({
+        success: true,
+        message: "Message sent successfully",
+      });
+    } else {
+      // If message sending failed, log the failure
+      await sessionService.logMessage(
+        username,
+        recipient,
+        message,
+        "failed",
+        messageResult.error
+      );
+
+      // Check if failure was due to invalid session
+      if (messageResult.error === "Session invalid") {
+        // Try one more time with a fresh login
+        logger.info(`Retrying with fresh login for ${username}`);
+        const retryLogin = await instagramLogin(username, password);
+
+        if (retryLogin.success) {
+          const retryMessage = await navigateAndSendMessage(
+            recipient,
+            message,
+            retryLogin.session
+          );
+
+          if (retryMessage.success) {
+            await sessionService.logMessage(
+              username,
+              recipient,
+              message,
+              "sent"
+            );
+            await sessionService.createOrUpdateSession(
+              username,
+              password,
+              retryLogin.session
+            );
+
+            return res.json({
+              success: true,
+              message: "Message sent successfully after session refresh",
+            });
+          }
+        }
+      }
+
+      logger.warn(`Failed to send message: ${messageResult.error}`);
+      res.status(messageResult.error === "Session invalid" ? 401 : 404).json({
+        success: false,
+        error: messageResult.error || "Failed to send message",
+      });
+    }
+  } catch (error) {
+    logger.error("Error in send-with-auth:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: error.message,
+    });
+  }
+});
+
 // Graceful shutdown
 process.on("SIGINT", async () => {
   try {
