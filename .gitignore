@@ -34,6 +34,8 @@ backend/.npm
 backend/uploads/
 backend/tmp/
 backend/instagram_session.json
+backend/debug_screenshots/*
+backend/logs/*
 
 # IDE and editor files
 .idea/
