@@ -102,19 +102,65 @@ class SessionService {
     }
   }
 
-  // Cleanup expired sessions
-  async cleanupExpiredSessions() {
+  async logMessage(fromUsername, recipient, content, status, error = null) {
     try {
-      const users = await this.getCollection();
-      await users.updateMany(
-        { "session.expiresAt": { $lt: new Date() } },
-        { $unset: { session: "" } }
-      );
+        const users = await this.getCollection();
+        const user = await users.findOne({ instagram_username: fromUsername });
+      if (!user) {
+        throw new Error("User not found");
+      }
+
+      user.messages.push({
+        recipient,
+        content,
+        status,
+        ...(error && { error: error.toString() }),
+        createdAt: new Date(),
+      });
+
+      user.lastActivity = new Date();
+      await user.save();
+
+      return user.messages[user.messages.length - 1];
     } catch (error) {
-      logger.error("Session cleanup error:", error);
+      logger.error("Error logging message:", error);
+      throw error;
     }
   }
 
+  async getMessageHistory(username, options = {}) {
+    try {
+      const query = { instagram_username: username };
+      const users = await this.getCollection();
+      const user = await users.findOne(query);
+
+      if (!user?.messages) {
+        return [];
+      }
+
+      let messages = user.messages;
+
+      // Apply filters
+      if (options.status) {
+        messages = messages.filter((msg) => msg.status === options.status);
+      }
+      if (options.recipient) {
+        messages = messages.filter(
+          (msg) => msg.recipient === options.recipient
+        );
+      }
+
+      // Sort by date (newest first)
+      messages.sort((a, b) => b.createdAt - a.createdAt);
+
+      return messages;
+    } catch (error) {
+      logger.error("Error getting message history:", error);
+      return [];
+    }
+  }
+
+  // Cleanup expired sessions
   async cleanupExpiredSessions() {
     try {
       const users = await this.getCollection();

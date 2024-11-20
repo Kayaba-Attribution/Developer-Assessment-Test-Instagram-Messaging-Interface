@@ -137,7 +137,6 @@ app.post("/api/session/load", async (req, res) => {
   }
 });
 
-
 app.post("/api/messages/send", async (req, res) => {
   try {
     const { username, from_username, content } = req.body;
@@ -145,7 +144,7 @@ app.post("/api/messages/send", async (req, res) => {
     if (!username || !from_username || !content) {
       return res.status(400).json({
         success: false,
-        error: "Username, from_username and content are required"
+        error: "Username, from_username and content are required",
       });
     }
 
@@ -156,53 +155,82 @@ app.post("/api/messages/send", async (req, res) => {
     if (!sessionValid) {
       return res.status(401).json({
         success: false,
-        error: "No valid session found"
+        error: "No valid session found",
       });
     }
 
-    // Get stored session data
-    const users = await sessionService.getCollection();
-    const user = await users.findOne({ instagram_username: from_username });
-    
-    if (!user?.session) {
+    // Get stored credentials
+    const credentials = await sessionService.getStoredCredentials(
+      from_username
+    );
+    if (!credentials?.session) {
+      await sessionService.logMessage(
+        from_username,
+        username,
+        content,
+        "failed",
+        "Session data not found"
+      );
       return res.status(401).json({
         success: false,
-        error: "Session data not found"
+        error: "Session data not found",
       });
     }
 
     // Try to send the message
-    const result = await navigateAndSendMessage(username, content, user.session);
+    const result = await navigateAndSendMessage(
+      username,
+      content,
+      user.session
+    );
 
     if (result.success) {
-      // Store message in database
-      await users.updateOne(
-        { instagram_username: from_username },
-        { 
-          $push: { 
-            messages: {
-              recipient: username,
-              content: content,
-              status: 'sent',
-              createdAt: new Date()
-            }
-          }
-        }
-      );
-
+      // Log successful message
+      await sessionService.logMessage(from_username, username, content, "sent");
       logger.info(`Successfully sent message to ${username}`);
       res.json(result);
     } else {
+      // Log failed message
+      await sessionService.logMessage(
+        from_username,
+        username,
+        content,
+        "failed",
+        result.error
+      );
       logger.warn(`Failed to send message: ${result.error}`);
-      res.status(result.error === 'Session invalid' ? 401 : 404).json(result);
+      res.status(result.error === "Session invalid" ? 401 : 404).json(result);
     }
-
   } catch (error) {
     logger.error("Message sending error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",
-      details: error.message
+      details: error.message,
+    });
+  }
+});
+
+// Add a route to get message history
+app.get("/api/messages/history/:username", async (req, res) => {
+  try {
+    const { username } = req.params;
+    const { status, recipient } = req.query;
+
+    const messages = await sessionService.getMessageHistory(username, {
+      status,
+      recipient,
+    });
+
+    res.json({
+      success: true,
+      data: messages,
+    });
+  } catch (error) {
+    logger.error("Error fetching message history:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch message history",
     });
   }
 });

@@ -38,8 +38,10 @@ Implement routes to process the recipient username and message and send the mess
         - page not found return
         - otherwise message
 - [x] ExpressJS route creation
-- [ ] Check Nonexistent Instagram recipient usernames.
+- [x] Send message
+- [x] Check Nonexistent Instagram recipient usernames.
 - [ ] Handle Failures in message delivery (e.g., network errors).
+- TODO: direct link to friends is not supported
 
 ### Database Management (MongoDB):
 
