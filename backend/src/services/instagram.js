@@ -4,25 +4,26 @@ const { chromium } = require("playwright");
 const logger = require("../utils/logger");
 const { config, isDev } = require("../config");
 const { QUERIES } = require("../config/constants");
-const { takeScreenshot, saveSessionToFile, loadSessionFromFile } = require("../utils/files");
-
-
+const {
+  takeScreenshot,
+  saveSessionToFile,
+  loadSessionFromFile,
+} = require("../utils/files");
 
 async function checkForErrors(page) {
-    try {
-      const errorElements = await page.queryElements(QUERIES.ERROR_MESSAGE);
-      if (errorElements?.error_message) {
-        const errorText = await errorElements.error_message.textContent();
-        logger.error("Login error message:", errorText);
-        return errorText;
-      }
-      return null;
-    } catch (error) {
-      logger.error("Error checking for errors:", error);
-      return "Unknown error occurred";
+  try {
+    const errorElements = await page.queryElements(QUERIES.ERROR_MESSAGE);
+    if (errorElements?.error_message) {
+      const errorText = await errorElements.error_message.textContent();
+      logger.error("Login error message:", errorText);
+      return errorText;
     }
+    return null;
+  } catch (error) {
+    logger.error("Error checking for errors:", error);
+    return "Unknown error occurred";
   }
-  
+}
 
 async function instagramLogin(username, password) {
   let browser;
@@ -85,11 +86,11 @@ async function instagramLogin(username, password) {
 
     const error = await checkForErrors(page);
     if (error) {
-        return {
-          success: false,
-          error: error
-        };
-      }
+      return {
+        success: false,
+        error: error,
+      };
+    }
 
     const currentUrl = page.url();
     const loginSuccess = !currentUrl.includes("accounts/login");
@@ -182,7 +183,108 @@ async function loadSavedSession() {
   }
 }
 
+async function navigateToMessage(username, sessionData) {
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: config.headless,
+      args: config.browserOptions.args,
+    });
+
+    const context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 720 },
+    });
+
+    // Add session cookies
+    await context.addCookies([
+      {
+        name: "sessionid",
+        value: sessionData.sessionId,
+        domain: ".instagram.com",
+        path: "/",
+      },
+      {
+        name: "ds_user_id",
+        value: sessionData.userId,
+        domain: ".instagram.com",
+        path: "/",
+      },
+      {
+        name: "csrftoken",
+        value: sessionData.csrfToken,
+        domain: ".instagram.com",
+        path: "/",
+      },
+      {
+        name: "rur",
+        value: sessionData.rur,
+        domain: ".instagram.com",
+        path: "/",
+      },
+    ]);
+
+    const page = await wrap(await context.newPage());
+
+    // First verify session by going to Instagram home
+    await page.goto("https://www.instagram.com/", {
+      waitUntil: "networkidle",
+    });
+
+    await page.waitForTimeout(3000);
+
+    // Check if we're logged in
+    const currentUrl = page.url();
+    if (currentUrl.includes("accounts/login")) {
+      return {
+        success: false,
+        error: "Session invalid",
+      };
+    }
+
+    // Now navigate to the message URL
+    await page.goto(`https://instagram.com/m/${username}`, {
+      waitUntil: "networkidle",
+    });
+
+    await page.waitForTimeout(3000);
+    await takeScreenshot(page, `message_navigation_${username}`);
+
+    const messageUrl = page.url();
+    logger.debug("Current URL after navigation:", messageUrl);
+
+    const pageContent = await page.content();
+    const isPageNotFound =
+      pageContent.includes("Page Not Found") ||
+      pageContent.includes("Sorry, this page isn't available");
+
+    if (isPageNotFound) {
+      return {
+        success: false,
+        error: "User not found",
+      };
+    }
+
+    return {
+      success: true,
+      url: messageUrl,
+    };
+  } catch (error) {
+    logger.error("Message navigation error:", error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
+
 module.exports = {
   instagramLogin,
   loadSavedSession,
+  navigateToMessage,
 };

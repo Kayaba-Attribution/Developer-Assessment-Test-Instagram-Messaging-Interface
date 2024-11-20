@@ -1,10 +1,15 @@
 // src/server.js
 require("dotenv").config();
+const { chromium } = require("playwright");
 const express = require("express");
 const fs = require("fs").promises;
 const logger = require("./utils/logger");
 const cleanup = require("./utils/cleanup");
-const { instagramLogin, loadSavedSession } = require("./services/instagram");
+const {
+  instagramLogin,
+  loadSavedSession,
+  navigateToMessage,
+} = require("./services/instagram");
 const { config, NODE_ENV } = require("./config");
 const { DIRECTORIES } = require("./config/constants");
 const db = require("./config/database");
@@ -130,6 +135,61 @@ app.post("/api/session/load", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to load session",
+    });
+  }
+});
+
+
+app.post("/api/messages/test-navigation", async (req, res) => {
+  try {
+    const { username, from_username } = req.body;
+
+    if (!username || !from_username) {
+      return res.status(400).json({
+        success: false,
+        error: "Username and from_username are required"
+      });
+    }
+
+    logger.info(`Testing message navigation to user: ${username}`);
+
+    // First load the session
+    const sessionValid = await sessionService.validateSession(from_username);
+    if (!sessionValid) {
+      return res.status(401).json({
+        success: false,
+        error: "No valid session found"
+      });
+    }
+
+    // Get stored session data
+    const users = await sessionService.getCollection();
+    const user = await users.findOne({ instagram_username: from_username });
+    
+    if (!user?.session) {
+      return res.status(401).json({
+        success: false,
+        error: "Session data not found"
+      });
+    }
+
+    // Try to navigate to the message page with session data
+    const result = await navigateToMessage(username, user.session);
+
+    if (result.success) {
+      logger.info(`Successfully navigated to message page for ${username}`);
+      res.json(result);
+    } else {
+      logger.warn(`Failed to navigate to message page: ${result.error}`);
+      res.status(result.error === 'Session invalid' ? 401 : 404).json(result);
+    }
+
+  } catch (error) {
+    logger.error("Message navigation error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: error.message
     });
   }
 });
