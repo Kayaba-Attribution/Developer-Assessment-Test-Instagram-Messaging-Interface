@@ -13,7 +13,7 @@ Overview: Make use of agentql service to take an user instagram credentials and 
 - [x] Setup AgentQL
 - [x] Basic Login
 - [x] Headless Login
-- [ ] Handle invalid login credentials.
+- [x] Handle invalid login credentials.
 
 **Session Management:** 
 Maintain a session state to track whether the user is already logged in. If logged in, skip the login step for future requests.

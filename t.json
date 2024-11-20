@@ -1,0 +1,152 @@
+{
+  "success": true,
+  "session": {
+    "cookies": [
+      {
+        "name": "csrftoken",
+        "value": "Gc3s2SSo9I5gCJKwGDvler",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1763535854.864351,
+        "httpOnly": false,
+        "secure": true,
+        "sameSite": "Lax"
+      },
+      {
+        "name": "datr",
+        "value": "3Ik9Z2zT2qKOvA_sogFjSOiU",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1766646236.912549,
+        "httpOnly": true,
+        "secure": true,
+        "sameSite": "None"
+      },
+      {
+        "name": "ig_did",
+        "value": "40B63B84-DA00-40A9-91C5-AB3D80E2BC89",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1763622252.616856,
+        "httpOnly": true,
+        "secure": true,
+        "sameSite": "Lax"
+      },
+      {
+        "name": "wd",
+        "value": "1280x720",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1732691053,
+        "httpOnly": false,
+        "secure": true,
+        "sameSite": "Lax"
+      },
+      {
+        "name": "mid",
+        "value": "Zz2J3QALAAHREl6lqZYHvw-Ni1bF",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1766646237.478613,
+        "httpOnly": false,
+        "secure": true,
+        "sameSite": "Lax"
+      },
+      {
+        "name": "ig_nrcb",
+        "value": "1",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1763622237.478645,
+        "httpOnly": false,
+        "secure": true,
+        "sameSite": "Lax"
+      },
+      {
+        "name": "sessionid",
+        "value": "1563421971%3A5hgfQb92UeabsZ%3A14%3AAYfPc4IHl0lxitUU6cFkrbkP7ys_3OPLV5K9mUndOQ",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1763622252.616723,
+        "httpOnly": true,
+        "secure": true,
+        "sameSite": "Lax"
+      },
+      {
+        "name": "ds_user_id",
+        "value": "1563421971",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1739862254.864455,
+        "httpOnly": false,
+        "secure": true,
+        "sameSite": "Lax"
+      },
+      {
+        "name": "ps_l",
+        "value": "1",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1766646252.801817,
+        "httpOnly": true,
+        "secure": true,
+        "sameSite": "Lax"
+      },
+      {
+        "name": "ps_n",
+        "value": "1",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": 1766646252.801874,
+        "httpOnly": true,
+        "secure": true,
+        "sameSite": "None"
+      },
+      {
+        "name": "test_cookie",
+        "value": "CheckForPermission",
+        "domain": ".doubleclick.net",
+        "path": "/",
+        "expires": 1732087154.283079,
+        "httpOnly": false,
+        "secure": true,
+        "sameSite": "None"
+      },
+      {
+        "name": "rur",
+        "value": "\"NCG\\0541563421971\\0541763622254:01f7d2d0576307181df9c288b10786bea2d513bedb00475e00417b9037f5c015b16fd7e6\"",
+        "domain": ".instagram.com",
+        "path": "/",
+        "expires": -1,
+        "httpOnly": true,
+        "secure": true,
+        "sameSite": "Lax"
+      }
+    ],
+    "origins": [
+      {
+        "origin": "https://www.instagram.com",
+        "localStorage": [
+          { "name": "armadillo_msgr_local_takeover", "value": "u69yet" },
+          { "name": "armadillo_msgr_mutex", "value": "u69yet" },
+          {
+            "name": "chatd-deviceid",
+            "value": "dfcfe490-4915-4a39-a73d-047ca52ad0fd"
+          },
+          { "name": "hb_timestamp", "value": "1732086237362" },
+          { "name": "IGSession", "value": "7xlskn:1732088053321" },
+          { "name": "pigeon_state", "value": "{\"lastDeviceInfoTime\":0}" },
+          { "name": "pixel_fire_ts", "value": "1732086253640" },
+          { "name": "signal_flush_timestamp", "value": "1732086237373" },
+          { "name": "Session", "value": "6n8zv3:1732086288321" },
+          {
+            "name": "has_interop_upgraded",
+            "value": "{\"lastCheckedAt\":1732086253223,\"status\":true}"
+          },
+          { "name": "lastDomChange", "value": "1732086250269" },
+          { "name": "banzai:last_storage_flush", "value": "1732086238295.9" }
+        ]
+      }
+    ]
+  }
+}

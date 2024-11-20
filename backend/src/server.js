@@ -8,12 +8,16 @@ const { instagramLogin, loadSavedSession } = require("./services/instagram");
 const { config, NODE_ENV } = require("./config");
 const { DIRECTORIES } = require("./config/constants");
 const { log } = require("console");
+const connectDB = require("./config/database");
 
 const app = express();
 app.use(express.json());
 
 // Initialize directories and cleanup
 async function initialize() {
+  // Connect to MongoDB
+  await connectDB();
+  
   // Create necessary directories
   for (const dir of DIRECTORIES) {
     const dirPath = config[`${dir.replace("debug_", "")}Dir`];
