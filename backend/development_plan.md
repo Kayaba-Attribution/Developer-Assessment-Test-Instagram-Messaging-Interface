@@ -10,16 +10,19 @@ Overview: Make use of agentql service to take an user instagram credentials and 
 #### Handle Login Requests: 
 
 **Use agentql to authenticate users.**
-- [ ] Setup AgentQL
-- [ ] Basic Login
-- [ ] Headless Login
-- [ ] Handle invalid login credentials.
+- [x] Setup AgentQL
+- [x] Basic Login
+- [x] Headless Login
+- [x] Handle invalid login credentials.
 
 **Session Management:** 
 Maintain a session state to track whether the user is already logged in. If logged in, skip the login step for future requests.
-- [ ] Save session state
-- [ ] Load saved session
+- [x] Save session state
+- [x] Load saved session
 *locally
+
+**Login API Specification**
+- [ ] login route creation
 
 **Send Messages:** 
 Implement routes to process the recipient username and message and send the message via Instagram.
