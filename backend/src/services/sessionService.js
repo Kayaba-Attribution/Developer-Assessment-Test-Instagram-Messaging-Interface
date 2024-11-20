@@ -170,18 +170,6 @@ class SessionService {
     }
   }
 
-  // Cleanup expired sessions
-  async cleanupExpiredSessions() {
-    try {
-      const users = await this.getCollection();
-      await users.updateMany(
-        { "session.expiresAt": { $lt: new Date() } },
-        { $unset: { session: "" } }
-      );
-    } catch (error) {
-      logger.error("Session cleanup error:", error);
-    }
-  }
 }
 
 module.exports = new SessionService();

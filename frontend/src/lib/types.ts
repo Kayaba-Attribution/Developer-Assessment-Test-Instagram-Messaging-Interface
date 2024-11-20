@@ -31,6 +31,7 @@ export interface Message {
     status: 'sent' | 'failed';
     timestamp: string;
     error?: string;
+    createdAt?: Date;
 }
 
 

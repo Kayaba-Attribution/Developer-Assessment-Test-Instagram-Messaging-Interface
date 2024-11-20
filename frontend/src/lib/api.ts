@@ -6,7 +6,6 @@ import {
     LoginResponse,
     MessageResponse,
     SessionResponse,
-    MessageStats,
     Message,
 } from './types';
 
@@ -17,37 +16,9 @@ const api = axios.create({
     },
 });
 
-// Type definitions for admin endpoints
-export interface MessageStatsResponse {
-    success: boolean;
-    data?: MessageStats;
-    error?: string;
-}
 
-export interface MessagesResponse {
-    success: boolean;
-    data?: {
-        messages: Message[];
-        pagination: {
-            total: number;
-            page: number;
-            totalPages: number;
-            hasMore: boolean;
-        };
-    };
-    error?: string;
-}
 
-export interface MessageFilters {
-    status?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-}
-
-// Others
+// New types and interfaces needed for the combined functionality
 export interface CombinedMessageResponse extends MessageResponse {
     sessionInfo?: {
         isNewSession: boolean;
@@ -62,9 +33,13 @@ export interface CombinedMessagePayload {
     message: string;
 }
 
+// Admin
+interface MessageHistoryResponse extends MessageResponse {
+    data?: Message[];
+}
 
 
-// Existing functions
+// Log and status functions
 export const loginUser = async (credentials: LoginCredentials): Promise<LoginResponse> => {
     try {
         const { data } = await api.post<LoginResponse>('/login', credentials);
@@ -162,68 +137,22 @@ export const sendMessageWithAuth = async (payload: CombinedMessagePayload): Prom
     }
 };
 
-interface MessageHistoryResponse extends MessageResponse {
-    data?: Message[];
-}
 
-
-export const getMessageHistory = async (username: string, recipient?: string): Promise<MessageHistoryResponse> => {
+// ADMIN
+export const getMessageHistory = async (username: string): Promise<MessageHistoryResponse> => {
     try {
-        const { data } = await api.get<MessageHistoryResponse>(
-            `/messages/history/${username}${recipient ? `?recipient=${recipient}` : ''}`
-        );
-        return data;
+      const { data } = await api.get<MessageHistoryResponse>(`/messages/history/${username}`);
+      return data;
     } catch (error) {
-        if (error instanceof AxiosError) {
-            return {
-                success: false,
-                error: error.response?.data?.error || 'Failed to fetch messages'
-            };
-        }
+      if (error instanceof AxiosError) {
         return {
-            success: false,
-            error: 'An unexpected error occurred'
+          success: false,
+          error: error.response?.data?.error || 'Failed to fetch messages'
         };
+      }
+      return {
+        success: false,
+        error: 'An unexpected error occurred'
+      };
     }
-};
-
-// Error handling utility
-export class ApiError extends Error {
-    constructor(
-        message: string,
-        public readonly code?: string,
-        public readonly status?: number
-    ) {
-        super(message);
-        this.name = 'ApiError';
-    }
-}
-
-// Type guard for checking API error responses
-export function isApiError(error: unknown): error is ApiError {
-    return error instanceof ApiError;
-}
-
-// Additional type definitions needed for the new functionality
-declare module './types' {
-    export interface CombinedMessagePayload {
-        username: string;
-        password: string;
-        recipient: string;
-        message: string;
-    }
-
-    export interface MessageDetails {
-        timestamp?: string;
-        status: 'sent' | 'failed';
-        error?: string;
-    }
-
-    export interface CombinedMessageResponse extends MessageResponse {
-        details?: MessageDetails;
-        sessionInfo?: {
-            isNewSession: boolean;
-            expiresAt?: string;
-        };
-    }
-}
+  };
