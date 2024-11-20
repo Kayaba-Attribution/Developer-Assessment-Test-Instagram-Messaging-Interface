@@ -37,10 +37,10 @@ Implement routes to process the recipient username and message and send the mess
 securely store user sessions and application logs, such as:
 
 **User login state** 
-- [ ] Create user schema
-- [ ] Integration with login module
-- [ ] Save session token and expiration +update state
-- [ ] Query to check if token its valid <-> +update state
+- [x] Create user schema
+- [x] Integration with login module
+- [x] Save session token and expiration +update state
+- [x] Query to check if token its valid <-> +update state
 
 **Message logs** 
 timestamp, recipient username, message content, delivery status

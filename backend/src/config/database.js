@@ -22,11 +22,12 @@ class Database {
       });
 
       await this.client.connect();
-      this.db = this.client.db(process.env.DB_NAME || "instagram_messenger");
 
       // Verify connection
       await this.client.db("admin").command({ ping: 1 });
       logger.info("Successfully connected to MongoDB");
+
+      this.db = this.client.db(process.env.DB_NAME || "instagram_messenger");
 
       return this.db;
     } catch (error) {
