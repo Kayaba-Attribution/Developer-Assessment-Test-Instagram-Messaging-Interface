@@ -183,7 +183,7 @@ async function loadSavedSession() {
   }
 }
 
-async function navigateToMessage(username, sessionData) {
+async function navigateAndSendMessage(username, content, sessionData) {
   let browser;
   try {
     browser = await chromium.launch({
@@ -227,14 +227,13 @@ async function navigateToMessage(username, sessionData) {
 
     const page = await wrap(await context.newPage());
 
-    // First verify session by going to Instagram home
+    // First verify session
     await page.goto("https://www.instagram.com/", {
       waitUntil: "networkidle",
     });
 
     await page.waitForTimeout(3000);
 
-    // Check if we're logged in
     const currentUrl = page.url();
     if (currentUrl.includes("accounts/login")) {
       return {
@@ -243,16 +242,16 @@ async function navigateToMessage(username, sessionData) {
       };
     }
 
-    // Now navigate to the message URL
+    // Navigate to message URL
     await page.goto(`https://instagram.com/m/${username}`, {
       waitUntil: "networkidle",
     });
 
     await page.waitForTimeout(3000);
-    await takeScreenshot(page, `message_navigation_${username}`);
+    await takeScreenshot(page, `message_page_${username}`);
 
     const messageUrl = page.url();
-    logger.debug("Current URL after navigation:", messageUrl);
+    logger.debug("Message URL:", messageUrl);
 
     const pageContent = await page.content();
     const isPageNotFound =
@@ -266,12 +265,54 @@ async function navigateToMessage(username, sessionData) {
       };
     }
 
+    // Wait for page to load
+    await page.waitForTimeout(2000);
+
+    // Find message input
+    let messageElements = await page.queryElements(QUERIES.MESSAGE_BOX);
+
+    if (!messageElements?.message_input) {
+      const screenshot = await takeScreenshot(
+        page,
+        `message_box_error_${username}`
+      );
+      return {
+        success: false,
+        error: "Could not find message input elements",
+      };
+    }
+
+    // Fill the message
+    await messageElements.message_input.fill(content);
+    await page.waitForTimeout(1000);
+
+    // Re-query for the send button after filling the input
+    messageElements = await page.queryElements(QUERIES.MESSAGE_BOX);
+
+    if (!messageElements?.send_button) {
+      const screenshot = await takeScreenshot(
+        page,
+        `send_button_error_${username}`
+      );
+      return {
+        success: false,
+        error: "Could not find send button after filling message",
+      };
+    }
+
+    // Click the send button
+    await messageElements.send_button.click();
+    await page.waitForTimeout(2000);
+
+    await takeScreenshot(page, `message_sent_${username}`);
+
     return {
       success: true,
       url: messageUrl,
+      message: content,
     };
   } catch (error) {
-    logger.error("Message navigation error:", error);
+    logger.error("Message sending error:", error);
     return {
       success: false,
       error: error.message,
@@ -282,9 +323,8 @@ async function navigateToMessage(username, sessionData) {
     }
   }
 }
-
 module.exports = {
   instagramLogin,
   loadSavedSession,
-  navigateToMessage,
+  navigateAndSendMessage,
 };

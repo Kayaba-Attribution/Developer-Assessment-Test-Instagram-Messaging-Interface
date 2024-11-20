@@ -1,14 +1,12 @@
 // src/server.js
 require("dotenv").config();
-const { chromium } = require("playwright");
 const express = require("express");
 const fs = require("fs").promises;
 const logger = require("./utils/logger");
 const cleanup = require("./utils/cleanup");
 const {
   instagramLogin,
-  loadSavedSession,
-  navigateToMessage,
+  navigateAndSendMessage,
 } = require("./services/instagram");
 const { config, NODE_ENV } = require("./config");
 const { DIRECTORIES } = require("./config/constants");
@@ -140,18 +138,18 @@ app.post("/api/session/load", async (req, res) => {
 });
 
 
-app.post("/api/messages/test-navigation", async (req, res) => {
+app.post("/api/messages/send", async (req, res) => {
   try {
-    const { username, from_username } = req.body;
+    const { username, from_username, content } = req.body;
 
-    if (!username || !from_username) {
+    if (!username || !from_username || !content) {
       return res.status(400).json({
         success: false,
-        error: "Username and from_username are required"
+        error: "Username, from_username and content are required"
       });
     }
 
-    logger.info(`Testing message navigation to user: ${username}`);
+    logger.info(`Attempting to send message to user: ${username}`);
 
     // First load the session
     const sessionValid = await sessionService.validateSession(from_username);
@@ -173,19 +171,34 @@ app.post("/api/messages/test-navigation", async (req, res) => {
       });
     }
 
-    // Try to navigate to the message page with session data
-    const result = await navigateToMessage(username, user.session);
+    // Try to send the message
+    const result = await navigateAndSendMessage(username, content, user.session);
 
     if (result.success) {
-      logger.info(`Successfully navigated to message page for ${username}`);
+      // Store message in database
+      await users.updateOne(
+        { instagram_username: from_username },
+        { 
+          $push: { 
+            messages: {
+              recipient: username,
+              content: content,
+              status: 'sent',
+              createdAt: new Date()
+            }
+          }
+        }
+      );
+
+      logger.info(`Successfully sent message to ${username}`);
       res.json(result);
     } else {
-      logger.warn(`Failed to navigate to message page: ${result.error}`);
+      logger.warn(`Failed to send message: ${result.error}`);
       res.status(result.error === 'Session invalid' ? 401 : 404).json(result);
     }
 
   } catch (error) {
-    logger.error("Message navigation error:", error);
+    logger.error("Message sending error:", error);
     res.status(500).json({
       success: false,
       error: "Internal server error",

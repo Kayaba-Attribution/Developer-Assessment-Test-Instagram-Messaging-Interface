@@ -26,7 +26,7 @@ Maintain a session state to track whether the user is already logged in. If logg
 
 **Send Messages:** 
 Implement routes to process the recipient username and message and send the message via Instagram.
-- [ ] AgentQL navigation to required user 
+- [x] AgentQL navigation to required user 
     - search button
     - input username
     - get first result
@@ -37,8 +37,8 @@ Implement routes to process the recipient username and message and send the mess
     - other approach -> leverage https://instagram.com/m/username 
         - page not found return
         - otherwise message
+- [x] ExpressJS route creation
 - [ ] Check Nonexistent Instagram recipient usernames.
-- [ ] ExpressJS route creation
 - [ ] Handle Failures in message delivery (e.g., network errors).
 
 ### Database Management (MongoDB):

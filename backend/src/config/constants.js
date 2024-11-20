@@ -20,11 +20,19 @@ const QUERIES = {
       confirmation_code_input
       submit_button
     }`,
+  MESSAGE_BOX: `{
+      message_input
+      send_button
+    }`,
+  NEW_MESSAGE: `{
+      first_message_input
+      first_chat_button
+    }`,
 };
 
-const DIRECTORIES = ['debug_screenshots', 'sessions', 'logs'];
+const DIRECTORIES = ["debug_screenshots", "sessions", "logs"];
 
 module.exports = {
   QUERIES,
-  DIRECTORIES
+  DIRECTORIES,
 };
