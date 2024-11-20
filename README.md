@@ -1,4 +1,119 @@
-### Developer-Assessment-Test-Instagram-Messaging-Interface
+# Developer-Assessment-Test-Instagram-Messaging-Interface
+
+_By Juan Gomez, and some neural network that knows too much_
+
+See original master plans:
+[Backend 70% time](backend/development_plan.md)
+[Frontend 30% time](frontend/development_plan.md)
+
+# Instagram Messenger Frontend
+
+React application for Instagram message automation with TypeScript and shadcn/ui.
+
+## Features
+
+- Session-based authentication with protected routes
+- Three message sending modes:
+  - Quick Send: Session-based
+  - Manual Input: Full credentials
+  - API-Based: JSON payload
+- Admin dashboard with:
+  - Message history tracking
+  - Status filtering
+  - Recipient search
+  - Real-time updates
+
+## Setup
+
+```bash
+npm install
+npm run dev
+```
+*_backend must be running on port 3000_
+## Tech Stack
+
+- React 18 with TypeScript
+- React Router v6
+- Axios for API calls
+- TailwindCSS & shadcn/ui
+- React Hook Form + Zod validation
+- Sonner for toasts
+
+## Project Structure
+
+```
+src/
+├── components/      # UI components
+├── contexts/        # Auth context
+├── lib/             # API and types
+```
+
+#### Routes
+- `/login`: Authentication
+- `/messages`: Message form
+- `/admin`: Message history dashboard
+
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Login
+    participant AuthContext
+    participant API
+    participant ProtectedRoute
+
+    User->>Login: Enter Credentials
+    Login->>API: loginUser()
+    API-->>Login: Return Session
+    Login->>AuthContext: setUsername()
+    AuthContext->>localStorage: Store Username
+    
+    Note over User,ProtectedRoute: Protected Route Access
+    User->>ProtectedRoute: Access Route
+    ProtectedRoute->>AuthContext: Check Auth
+    alt Valid Session
+        AuthContext-->>ProtectedRoute: Allow Access
+        ProtectedRoute-->>User: Show Content
+    else Invalid Session
+        AuthContext-->>ProtectedRoute: Deny Access
+        ProtectedRoute->>Login: Redirect
+    end
+```
+
+### Message Operations Flow
+```mermaid
+flowchart TD
+    User[User] --> LoginChoice{Choose Login Method}
+    
+    LoginChoice -->|Quick Send| Session[Use Existing Session]
+    LoginChoice -->|Manual| Credentials[Enter Full Credentials] 
+    LoginChoice -->|JSON| JsonInput[Paste JSON Config]
+    
+    Session & Credentials & JsonInput --> MessageForm[Message Form]
+    MessageForm -->|Send| Backend[Backend API]
+    
+    Backend -->|Success| Success[Success Toast]
+    Backend -->|Error| Error[Error Toast]
+    Backend --> Store[Store in DB]
+    
+    Store --> History[Message History]
+    History --> Filters[Apply Filters]
+    
+    subgraph Admin Dashboard
+        Filters -->|Status| StatusFilter[Status: Sent/Failed]
+        Filters -->|Search| SearchFilter[Search Recipients]
+        Filters -->|Time| TimeFilter[Sort by Time]
+        
+        StatusFilter & SearchFilter & TimeFilter --> Display[Display Results]
+    end
+    
+    style Session fill:#e3f2fd
+    style Credentials fill:#e3f2fd  
+    style JsonInput fill:#e3f2fd
+    style History fill:#fce4ec
+    style Display fill:#fce4ec
+```
 
 # Instagram Messenger Backend
 
