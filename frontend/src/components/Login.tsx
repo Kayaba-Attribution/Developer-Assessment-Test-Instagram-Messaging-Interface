@@ -1,7 +1,7 @@
 // src/components/Login.tsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { loginUser } from "../lib/api";
 import { toast } from "sonner";
 import { Button } from "./ui/button";

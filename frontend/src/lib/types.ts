@@ -29,8 +29,19 @@ export interface Message {
     recipient: string;
     content: string;
     status: 'sent' | 'failed';
-    createdAt: Date;
+    timestamp: string;
     error?: string;
+}
+
+
+export interface MessageStats {
+    total: number;
+    byStatus: {
+        [key: string]: {
+            count: number;
+            uniqueRecipients: number;
+        };
+    };
 }
 
 export interface LoginResponse {

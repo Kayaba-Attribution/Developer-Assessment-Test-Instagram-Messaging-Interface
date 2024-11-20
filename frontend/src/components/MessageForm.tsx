@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../context/AuthContext";
 import { sendMessage, sendMessageWithAuth } from "../lib/api";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -16,7 +16,7 @@ interface FormState {
 }
 
 export function MessageForm() {
-  const { username: currentUser, logout } = useAuth();
+  const { username: currentUser, } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState<FormState>({
@@ -94,16 +94,7 @@ export function MessageForm() {
       <div className="max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">Send Message</h2>
-          {currentUser && (
-            <div className="space-x-4">
-              <span className="text-sm text-gray-600">
-                Logged in as: {currentUser}
-              </span>
-              <Button variant="outline" onClick={logout}>
-                Logout
-              </Button>
-            </div>
-          )}
+
         </div>
 
         <Tabs defaultValue="main" className="w-full">

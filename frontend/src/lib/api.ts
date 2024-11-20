@@ -5,7 +5,9 @@ import {
     MessagePayload,
     LoginResponse,
     MessageResponse,
-    SessionResponse
+    SessionResponse,
+    MessageStats,
+    Message,
 } from './types';
 
 const api = axios.create({
@@ -15,7 +17,37 @@ const api = axios.create({
     },
 });
 
-// Updated type definitions
+// Type definitions for admin endpoints
+export interface MessageStatsResponse {
+    success: boolean;
+    data?: MessageStats;
+    error?: string;
+}
+
+export interface MessagesResponse {
+    success: boolean;
+    data?: {
+        messages: Message[];
+        pagination: {
+            total: number;
+            page: number;
+            totalPages: number;
+            hasMore: boolean;
+        };
+    };
+    error?: string;
+}
+
+export interface MessageFilters {
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+}
+
+// Others
 export interface CombinedMessageResponse extends MessageResponse {
     sessionInfo?: {
         isNewSession: boolean;
@@ -29,6 +61,8 @@ export interface CombinedMessagePayload {
     recipient: string;
     message: string;
 }
+
+
 
 // Existing functions
 export const loginUser = async (credentials: LoginCredentials): Promise<LoginResponse> => {
@@ -124,6 +158,31 @@ export const sendMessageWithAuth = async (payload: CombinedMessagePayload): Prom
             success: false,
             error: 'An unexpected error occurred',
 
+        };
+    }
+};
+
+interface MessageHistoryResponse extends MessageResponse {
+    data?: Message[];
+}
+
+
+export const getMessageHistory = async (username: string, recipient?: string): Promise<MessageHistoryResponse> => {
+    try {
+        const { data } = await api.get<MessageHistoryResponse>(
+            `/messages/history/${username}${recipient ? `?recipient=${recipient}` : ''}`
+        );
+        return data;
+    } catch (error) {
+        if (error instanceof AxiosError) {
+            return {
+                success: false,
+                error: error.response?.data?.error || 'Failed to fetch messages'
+            };
+        }
+        return {
+            success: false,
+            error: 'An unexpected error occurred'
         };
     }
 };
