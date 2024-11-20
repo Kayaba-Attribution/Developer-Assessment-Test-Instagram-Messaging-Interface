@@ -5,6 +5,39 @@ const path = require("path");
 const logger = require("../utils/logger");
 const { config, isDev } = require("../config");
 const { QUERIES } = require("../config/constants");
+const fs = require("fs").promises;
+
+// Function to save session data to file (dev only)
+async function saveSessionToFile(sessionData) {
+  if (isDev) {
+    try {
+      const sessionFile = path.join(
+        __dirname,
+        "../../sessions/saved_session.json"
+      );
+      await fs.writeFile(sessionFile, JSON.stringify(sessionData, null, 2));
+      logger.info("Session data saved to file");
+    } catch (error) {
+      logger.error("Error saving session to file:", error);
+    }
+  }
+}
+
+// Function to load session data from file
+async function loadSessionFromFile() {
+  try {
+    const sessionFile = path.join(
+      __dirname,
+      "../../sessions/saved_session.json"
+    );
+    console.log(sessionFile);
+    const data = await fs.readFile(sessionFile, "utf8");
+    return JSON.parse(data);
+  } catch (error) {
+    logger.error("Error loading session from file:", error);
+    throw new Error("Failed to load session data");
+  }
+}
 
 async function takeScreenshot(page, name) {
   if (!config.saveScreenshots) return null;
@@ -108,9 +141,9 @@ async function instagramLogin(username, password) {
     }
 
     await loginForm.login_form.username_input.fill(username);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     await loginForm.login_form.password_input.fill(password);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
 
     await loginForm.login_form.login_button.click();
     await page.waitForTimeout(5000);
@@ -136,6 +169,8 @@ async function instagramLogin(username, password) {
         cookiesCount: sessionState.cookies.length,
         originsCount: sessionState.origins.length,
       });
+      // Save session data if in dev mode
+      await saveSessionToFile(sessionState);
     }
 
     return {
@@ -166,6 +201,52 @@ async function instagramLogin(username, password) {
   }
 }
 
+async function loadSavedSession() {
+  let browser;
+  let context;
+  let page;
+
+  try {
+    const sessionData = await loadSessionFromFile();
+
+    browser = await chromium.launch({
+      headless: config.headless,
+      args: config.browserOptions.args,
+    });
+
+    context = await browser.newContext({
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 720 },
+      storageState: sessionData,
+    });
+
+    page = await wrap(await context.newPage());
+
+    await page.goto("https://www.instagram.com/");
+    await page.waitForTimeout(3000);
+
+    const currentUrl = page.url();
+    if (currentUrl.includes("accounts/login")) {
+      throw new Error("Session invalid");
+    }
+
+    return {
+      success: true,
+      message: "Session loaded successfully",
+    };
+  } catch (error) {
+    logger.error("Session loading error:", error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  } finally {
+    if (browser) await browser.close();
+  }
+}
+
 module.exports = {
   instagramLogin,
+  loadSavedSession,
 };

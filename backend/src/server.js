@@ -4,7 +4,7 @@ const express = require("express");
 const fs = require("fs").promises;
 const logger = require("./utils/logger");
 const cleanup = require("./utils/cleanup");
-const { instagramLogin } = require("./services/instagram");
+const { instagramLogin, loadSavedSession } = require("./services/instagram");
 const { config, NODE_ENV } = require("./config");
 const { DIRECTORIES } = require("./config/constants");
 
@@ -54,6 +54,19 @@ app.post("/api/login", async (req, res) => {
       success: false,
       error: "Internal server error",
       details: error.message,
+    });
+  }
+});
+
+// Simple load saved session route
+app.post("/api/session/load", async (req, res) => {
+  try {
+    const result = await loadSavedSession();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to load session",
     });
   }
 });

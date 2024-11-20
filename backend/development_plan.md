@@ -55,3 +55,5 @@ Implement robust error handling for:
 - Provide meaningful feedback to the user via the UI, such as:
 - Success or failure message after sending a message.
 - Specific error descriptions (e.g., “Incorrect username or password”).
+
+
