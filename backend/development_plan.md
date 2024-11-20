@@ -40,8 +40,8 @@ Implement routes to process the recipient username and message and send the mess
 - [x] ExpressJS route creation
 - [x] Send message
 - [x] Check Nonexistent Instagram recipient usernames.
-- [ ] Handle Failures in message delivery (e.g., network errors).
-- TODO: direct link to friends is not supported
+- [x] Handle Failures in message delivery (e.g., network errors).
+**- TODO: direct link to friends is not supported**
 
 ### Database Management (MongoDB):
 
@@ -56,8 +56,8 @@ securely store user sessions and application logs, such as:
 
 **Message logs** 
 timestamp, recipient username, message content, delivery status
-- [ ] Update user schema
-- [ ] Integration with message sender module
+- [x] Update user schema
+- [x] Integration with message sender module
 
 3. Errors encountered during processing.
 
