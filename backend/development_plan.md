@@ -1,5 +1,13 @@
 ### Back-End Development (Node.js):
 
+**THIS IS A ROUGH OVERVIEW OF A DEV PLAN**
+
+#### **TODO:**
+    - direct link to friends is not supported
+    - restricted accounts
+    - 1+ messages to unknown fails
+
+
 Overview: Make use of agentql service to take an user instagram credentials and do the following:
 
 1. Log in into the account - or load state if possible
@@ -41,7 +49,6 @@ Implement routes to process the recipient username and message and send the mess
 - [x] Send message
 - [x] Check Nonexistent Instagram recipient usernames.
 - [x] Handle Failures in message delivery (e.g., network errors).
-**- TODO: direct link to friends is not supported**
 
 ### Database Management (MongoDB):
 

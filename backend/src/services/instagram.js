@@ -4,6 +4,7 @@ const { chromium } = require("playwright");
 const logger = require("../utils/logger");
 const { config, isDev } = require("../config");
 const { QUERIES } = require("../config/constants");
+
 const {
   takeScreenshot,
   saveSessionToFile,
@@ -24,6 +25,7 @@ async function checkForErrors(page) {
     return "Unknown error occurred";
   }
 }
+
 
 async function instagramLogin(username, password) {
   let browser;
@@ -60,7 +62,7 @@ async function instagramLogin(username, password) {
       waitUntil: "networkidle",
     });
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
     await takeScreenshot(page, "before_login");
 
     const loginForm = await page.queryElements(QUERIES.LOGIN_FORM);
@@ -161,7 +163,7 @@ async function loadSavedSession() {
     page = await wrap(await context.newPage());
 
     await page.goto("https://www.instagram.com/");
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
 
     const currentUrl = page.url();
     if (currentUrl.includes("accounts/login")) {
@@ -237,7 +239,7 @@ async function navigateAndSendMessage(username, content, sessionData) {
       waitUntil: "networkidle",
     });
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
 
     const currentUrl = page.url();
     if (currentUrl.includes("accounts/login")) {
@@ -252,7 +254,7 @@ async function navigateAndSendMessage(username, content, sessionData) {
       waitUntil: "networkidle",
     });
 
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(2000);
     await takeScreenshot(page, `message_page_${username}`);
 
     const messageUrl = page.url();

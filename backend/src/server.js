@@ -220,6 +220,7 @@ app.post("/api/messages/send", async (req, res) => {
     const credentials = await sessionService.getStoredCredentials(
       from_username
     );
+
     logger.info(`[/api/messages/send] Loaded credentials for ${from_username}`);
     if (!credentials?.session) {
       await sessionService.logMessage(
@@ -293,7 +294,6 @@ app.get("/api/messages/history/:username", async (req, res) => {
   }
 });
 
-
 // Route to send message with authentication THE ALL-MIGHTY ROUTE
 app.post("/api/messages/send-with-auth", async (req, res) => {
   try {
@@ -337,12 +337,12 @@ app.post("/api/messages/send-with-auth", async (req, res) => {
         sessionData
       );
       logger.info(`New session created for ${username}`);
-    } else {
+
       // Use existing session
       logger.info(`Using existing session for ${username}`);
       const credentials = await sessionService.getStoredCredentials(username);
       sessionData = credentials?.session;
-
+    } else {
       if (!sessionData) {
         // Edge case: session marked valid but data missing
         logger.warn(`Session marked valid but no data found for ${username}`);
