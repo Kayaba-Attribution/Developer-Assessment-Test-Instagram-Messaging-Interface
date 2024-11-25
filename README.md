@@ -11,10 +11,11 @@
 + [ ] AgentQL Instagram creation
   - [X] Instagram service add register
   - [X] test workflow
-  - [ ] get and use custom email
-  - [ ] fill in all other fields
-  - [ ] choose birthday and submit
-  - [ ] wait 5 sec
+  - [X] get and use custom email
+  - [X] fill in all other fields
+  - [X] choose birthday and submit
+    - ! requery elements and click submit
+  - [X] wait 5 sec
     - [ ] extract code from temp email
     - [ ] input code and wait
 

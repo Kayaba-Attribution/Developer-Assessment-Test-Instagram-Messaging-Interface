@@ -307,6 +307,58 @@ app.get("/api/mail/code/:hash", async (req, res) => {
   }
 });
 
+
+// #########################################################
+// ################# INSTAGRAM REGISTER ####################
+// #########################################################
+
+const instagramService = require("./services/instagramRegistrationService");
+
+// Single API endpoint for registration
+app.post("/api/instagram/register", async (req, res) => {
+  try {
+    const result = await instagramService.register();
+    
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+    
+    res.json(result);
+  } catch (error) {
+    logger.error("Registration error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Status check endpoint
+app.get("/api/instagram/register/status/:username", (req, res) => {
+  try {
+    const { username } = req.params;
+    const status = instagramService.getRegistrationStatus(username);
+    
+    if (!status) {
+      return res.status(404).json({
+        success: false,
+        error: "Registration not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error) {
+    logger.error("Status check error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Add after your routes
 app.use((err, req, res, next) => {
   logger.error("Unhandled error", {
