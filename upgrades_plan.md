@@ -25,34 +25,6 @@ General Features
 3.  Default Delay: 20 seconds between actions (adjustable in the UI)
 4.  Generative AI: Utilized for paraphrasing replies.
 
-### Breaking changes, plan, notes:
-+ remove ig login as entry -> standard username/password
-  - add google oauth in the future
-+ modify data schema
-  - user -> many accounts -> session & many-msgs
-+ create instagram account
-  - AgentQL routes ig
-  - email creation service
-  - verification code handling
-  - account creation UI
-    - call API route to perform tasks bulk (realtime updates -> later)
-  - perform login on all accounts and save credentials
-+ account management 
-  - status API 
-  - select owned accounts
-  + Comments
-    + input text
-    + OpenAI call
-    + parse and show responses
-  - API route actions
-    - accounts, like/reply
-    - like API: load session and like agentQL
-    - comment API: load session and input text
-  + log all (check data schema)
-+ logs page
-  + TODO
-
-
 ### Tabs and UI Flow
 
 #### Account Management Tab
