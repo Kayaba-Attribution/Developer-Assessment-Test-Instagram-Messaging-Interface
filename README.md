@@ -9,14 +9,16 @@
     - [ ] update front end
 
 + [ ] AgentQL Instagram creation
-  - [ ] Instagram service add register
-  - [ ] test workflow
+  - [X] Instagram service add register
+  - [X] test workflow
   - [ ] get and use custom email
   - [ ] fill in all other fields
   - [ ] choose birthday and submit
   - [ ] wait 5 sec
     - [ ] extract code from temp email
     - [ ] input code and wait
+
+
   - [ ] save credentials
 
 
@@ -32,6 +34,11 @@
     - [ ] call API route to perform tasks bulk (realtime updates -> later)
   - perform login on all accounts and save credentials
 
+
+**using https://temp-mail.org/en/api**
+Free tier: 100 req/day
+Pro tier: $19/mo 5000 req/day
++ https://rapidapi.com/Privatix/api/temp-mail/pricing
 
 
 + account management 

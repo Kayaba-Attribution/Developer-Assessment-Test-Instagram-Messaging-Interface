@@ -11,6 +11,7 @@ const { ObjectId } = require("mongodb");
 const {
   instagramLogin,
   navigateAndSendMessage,
+  instagramRegister,
 } = require("./services/instagram");
 const { config, NODE_ENV } = require("./config");
 const { DIRECTORIES } = require("./config/constants");
@@ -458,6 +459,98 @@ app.post("/api/session/load", async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to load session",
+    });
+  }
+});
+
+app.post("/api/instagram/register", async (req, res) => {
+  try {
+    logger.info("Received registration request");
+
+    // Attempt registration
+    const result = await instagramRegister();
+
+    if (result.success) {
+      // Log successful registration
+      logger.info(`Successfully registered Instagram account: ${result.data.username}`);
+      
+      // Store registration details if needed
+      await sessionService.logRegistration(
+        result.data.username,
+        result.data.email,
+        "completed"
+      );
+
+      res.json({
+        success: true,
+        data: {
+          username: result.data.username,
+          email: result.data.email
+        }
+      });
+    } else {
+      // Log failed registration
+      logger.warn(`Registration failed: ${result.error}`);
+      
+      await sessionService.logRegistration(
+        null,
+        null,
+        "failed",
+        result.error
+      );
+
+      res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    logger.error("Registration error:", error);
+    
+
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: error.message
+    });
+  }
+});
+
+app.post("/api/instagram/register", async (req, res) => {
+  try {
+    logger.info("Received registration request");
+
+    // Attempt registration
+    const result = await instagramRegister();
+
+    if (result.success) {
+      // Log successful registration
+      logger.info(`Successfully registered Instagram account: ${result.data.username}`);
+
+
+      res.json({
+        success: true,
+        data: {
+          username: result.data.username,
+          email: result.data.email
+        }
+      });
+    } else {
+      // Log failed registration
+      logger.warn(`Registration failed: ${result.error}`);
+
+      res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+  } catch (error) {
+    logger.error("Registration error:", error);
+
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+      details: error.message
     });
   }
 });

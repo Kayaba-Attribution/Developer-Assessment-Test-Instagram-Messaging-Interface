@@ -185,6 +185,97 @@ async function loadSavedSession() {
   }
 }
 
+async function instagramRegister() {
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: config.headless,
+      args: config.browserOptions.args,
+    });
+    logger.info("Browser launched");
+
+    const context = await browser.newContext({
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 720 },
+    });
+
+    const page = await wrap(await context.newPage());
+
+    logger.info("Navigating to Instagram signup page");
+
+    // Navigate to signup page
+    await page.goto("https://www.instagram.com/accounts/emailsignup/", {
+      waitUntil: "networkidle",
+    });
+
+    await page.waitForTimeout(2000);
+
+    // Define the registration form selectors
+    const SIGNUP_FIELDS = {
+      email: 'input[name="emailOrPhone"]',
+      fullName: 'input[name="fullName"]',
+      username: 'input[name="username"]',
+      password: 'input[name="password"]',
+      signupButton: 'button[type="submit"]'
+    };
+
+    // Generate dummy data
+    const dummyData = {
+      email: `test${Date.now()}@example.com`,
+      fullName: "Test User",
+      username: `testuser${Date.now()}`,
+      password: "TestPassword123!"
+    };
+
+    logger.info("Filling registration form");
+
+    // Fill in the form fields
+    await page.waitForSelector(SIGNUP_FIELDS.email);
+    await page.fill(SIGNUP_FIELDS.email, dummyData.email);
+    
+    await page.waitForSelector(SIGNUP_FIELDS.fullName);
+    await page.fill(SIGNUP_FIELDS.fullName, dummyData.fullName);
+    
+    await page.waitForSelector(SIGNUP_FIELDS.username);
+    await page.fill(SIGNUP_FIELDS.username, dummyData.username);
+    
+    await page.waitForSelector(SIGNUP_FIELDS.password);
+    await page.fill(SIGNUP_FIELDS.password, dummyData.password);
+
+    // Take screenshot before submission
+    await takeScreenshot(page, "registration_form_filled");
+
+    // Click signup button
+    await page.waitForSelector(SIGNUP_FIELDS.signupButton);
+    await page.click(SIGNUP_FIELDS.signupButton);
+
+    // Wait for 5 seconds after submission
+    await page.waitForTimeout(5000);
+
+    // Take screenshot after submission
+    await takeScreenshot(page, "registration_submitted");
+
+    return {
+      success: true,
+      data: {
+        email: dummyData.email,
+        username: dummyData.username
+      }
+    };
+
+  } catch (error) {
+    logger.error("Registration error:", error);
+    return {
+      success: false,
+      error: error.message
+    };
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
+
 async function navigateAndSendMessage(username, content, sessionData) {
   let browser;
   try {
@@ -334,4 +425,5 @@ module.exports = {
   instagramLogin,
   loadSavedSession,
   navigateAndSendMessage,
+  instagramRegister
 };
