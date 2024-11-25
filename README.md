@@ -27,7 +27,15 @@ General Features
 
 ### Breaking changes, plan, notes:
 + remove ig login as entry -> standard username/password
-  - add google oauth in the future
+  - add google oauth 
+    - [ ] passport dep
+    - [ ] create google vars
+    - [ ] update user model 
+    - [ ] update backend
+    - [ ] test login for main app
+    - [ ] update front end
+
+  
 + modify data schema
   - user -> many accounts -> session & many-msgs
 + create instagram account
