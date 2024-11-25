@@ -6,7 +6,7 @@ const cors = require("cors");
 const logger = require("./utils/logger");
 const cleanup = require("./utils/cleanup");
 const MongoStore = require("connect-mongo");
-const { ObjectId } = require('mongodb');
+const { ObjectId } = require("mongodb");
 
 const {
   instagramLogin,
@@ -27,6 +27,7 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const session = require("express-session");
 
 const app = express();
+logger.info("Starting server... on port", process.env.PORT);
 app.use(express.json());
 // Simple CORS setup for development
 app.use(
@@ -101,7 +102,7 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader("Access-Control-Allow-Credentials", "true");
   next();
 });
 
@@ -230,6 +231,79 @@ app.get("/api/auth/user", (req, res) => {
   }
 
   res.json({ user: req.user });
+});
+
+// ################################################
+// ################# TEMP MAIL ####################
+// ################################################
+
+const tempMailService = require("./services/tempMail");
+
+// Create new email address
+app.post("/api/mail/create", (req, res) => {
+  try {
+    const { prefix } = req.body;
+    const emailData = tempMailService.generateEmail(prefix);
+    res.json(emailData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Similarly for other routes
+app.get("/api/mail/messages/:hash", async (req, res) => {
+  try {
+    const { hash } = req.params;
+    const emails = await tempMailService.getEmails(hash);
+
+    const processedEmails = emails.map((email) => ({
+      id: email.mail_id,
+      from: email.mail_from,
+      subject: email.mail_subject,
+      timestamp: email.mail_timestamp,
+      verificationCode: tempMailService.extractVerificationCode(
+        email.mail_subject
+      ),
+    }));
+
+    res.json(processedEmails);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get just the latest verification code
+app.get("/api/mail/code/:hash", async (req, res) => {
+  try {
+    const { hash } = req.params;
+    const emails = await tempMailService.getEmails(hash);
+
+    const sortedEmails = emails.sort(
+      (a, b) => b.mail_timestamp - a.mail_timestamp
+    );
+
+    for (const email of sortedEmails) {
+      const code = tempMailService.extractVerificationCode(email.mail_subject);
+      if (code) {
+        return res.json({
+          success: true,
+          code,
+          timestamp: email.mail_timestamp,
+          from: email.mail_from,
+        });
+      }
+    }
+
+    res.json({
+      success: false,
+      error: "No verification code found",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 });
 
 // Add after your routes
