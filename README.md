@@ -28,9 +28,9 @@ General Features
 ### Breaking changes, plan, notes:
 + remove ig login as entry -> standard username/password
   - add google oauth 
-    - [ ] passport dep
-    - [ ] create google vars
-    - [ ] update user model 
+    - [x] passport dep
+    - [x] create google vars
+    - [x] update user model 
     - [ ] update backend
     - [ ] test login for main app
     - [ ] update front end
