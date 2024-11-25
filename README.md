@@ -32,7 +32,7 @@ General Features
     - [x] create google vars
     - [x] update user model 
     - [x] update backend
-    - [ ] test login for main app
+    - [x] test login for main app
     - [ ] update front end
 
   

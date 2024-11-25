@@ -18,6 +18,7 @@ const api = axios.create({
 
 
 
+
 // New types and interfaces needed for the combined functionality
 export interface CombinedMessageResponse extends MessageResponse {
     sessionInfo?: {
@@ -38,6 +39,24 @@ interface MessageHistoryResponse extends MessageResponse {
     data?: Message[];
 }
 
+interface GoogleUser {
+    _id: string;
+    email: string;
+    name: string;
+}
+
+interface AuthResponse {
+    user: GoogleUser | null;
+}
+
+export const getCurrentUser = async (): Promise<AuthResponse> => {
+    const { data } = await api.get<AuthResponse>('/auth/user');
+    return data;
+};
+
+export const logoutUser = async (): Promise<void> => {
+    await api.get('/auth/logout');
+};
 
 // Log and status functions
 export const loginUser = async (credentials: LoginCredentials): Promise<LoginResponse> => {
@@ -141,18 +160,18 @@ export const sendMessageWithAuth = async (payload: CombinedMessagePayload): Prom
 // ADMIN
 export const getMessageHistory = async (username: string): Promise<MessageHistoryResponse> => {
     try {
-      const { data } = await api.get<MessageHistoryResponse>(`/messages/history/${username}`);
-      return data;
+        const { data } = await api.get<MessageHistoryResponse>(`/messages/history/${username}`);
+        return data;
     } catch (error) {
-      if (error instanceof AxiosError) {
+        if (error instanceof AxiosError) {
+            return {
+                success: false,
+                error: error.response?.data?.error || 'Failed to fetch messages'
+            };
+        }
         return {
-          success: false,
-          error: error.response?.data?.error || 'Failed to fetch messages'
+            success: false,
+            error: 'An unexpected error occurred'
         };
-      }
-      return {
-        success: false,
-        error: 'An unexpected error occurred'
-      };
     }
-  };
+};

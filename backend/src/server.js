@@ -5,6 +5,9 @@ const fs = require("fs").promises;
 const cors = require("cors");
 const logger = require("./utils/logger");
 const cleanup = require("./utils/cleanup");
+const MongoStore = require("connect-mongo");
+const { ObjectId } = require('mongodb');
+
 const {
   instagramLogin,
   navigateAndSendMessage,
@@ -14,6 +17,10 @@ const { DIRECTORIES } = require("./config/constants");
 const db = require("./config/database");
 const sessionService = require("./services/sessionService");
 
+// Constants
+const FRONTEND_URL = "http://localhost:5173";
+const BACKEND_URL = "http://localhost:3000";
+
 // Google Sign
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
@@ -22,7 +29,12 @@ const session = require("express-session");
 const app = express();
 app.use(express.json());
 // Simple CORS setup for development
-app.use(cors());
+app.use(
+  cors({
+    origin: FRONTEND_URL,
+    credentials: true,
+  })
+);
 
 // Initialize app
 async function initialize() {
@@ -59,57 +71,175 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      dbName: process.env.DB_NAME || "instagram_messenger",
+      collectionName: "sessions",
+      ttl: 24 * 60 * 60, // 1 day
+    }),
+    cookie: {
+      maxAge: 24 * 60 * 60 * 1000,
+      secure: false, // set to true in production
+      sameSite: "lax",
+    },
   })
 );
+
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.use((req, res, next) => {
+  logger.info("Incoming request", {
+    path: req.path,
+    method: req.method,
+    isAuthenticated: req.isAuthenticated?.(),
+    sessionID: req.sessionID,
+    hasSession: !!req.session,
+    hasUser: !!req.user,
+  });
+  next();
+});
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/api/auth/google/callback",
+      callbackURL: "http://localhost:3000/api/auth/google/callback",
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        const user = await sessionService.findOrCreateGoogleUser(profile);
-        done(null, user);
+        logger.info("Google strategy executing", {
+          profileId: profile.id,
+          email: profile.emails?.[0]?.value || "no email",
+          name: profile.displayName,
+          // Log full profile for debugging
+          profile: JSON.stringify(profile, null, 2),
+        });
+
+        const users = await db.getCollection("users");
+        let user = await users.findOne({ googleId: profile.id });
+
+        if (!user) {
+          logger.info("Creating new user");
+          // Safely get email
+          const email =
+            profile.emails?.[0]?.value || `${profile.id}@placeholder.com`;
+
+          const result = await users.insertOne({
+            googleId: profile.id,
+            email: email,
+            name: profile.displayName || "Anonymous",
+            createdAt: new Date(),
+          });
+
+          user = await users.findOne({ _id: result.insertedId });
+          logger.info("New user created", { userId: user._id });
+        }
+
+        logger.info("User found/created", {
+          userId: user._id,
+          googleId: user.googleId,
+        });
+
+        return done(null, user);
       } catch (error) {
-        done(error, null);
+        logger.error("Error in Google strategy", {
+          message: error.message,
+          stack: error.stack,
+        });
+        return done(error, null);
       }
     }
   )
 );
 
-passport.serializeUser((user, done) => done(null, user.googleId));
-passport.deserializeUser(async (googleId, done) => {
+passport.serializeUser((user, done) => {
+  done(null, user._id);
+});
+
+passport.deserializeUser(async (id, done) => {
   try {
-    const user = await sessionService.getOAuthUser(googleId);
+    const users = await db.getCollection("users");
+    const user = await users.findOne({ _id: new ObjectId(id) }); // Convert string to ObjectId
     done(null, user);
   } catch (error) {
+    logger.error("Deserialize error", error);
     done(error, null);
   }
 });
-
-// Add OAuth routes
-app.get('/api/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
+// Auth routes with enhanced logging
+app.get(
+  "/api/auth/google",
+  (req, res, next) => {
+    logger.info("Google auth initiated", {
+      sessionID: req.sessionID,
+      hasSession: !!req.session,
+    });
+    next();
+  },
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    prompt: "select_account",
+  })
 );
 
-app.get('/api/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => res.redirect('/')
+// server.js
+app.get(
+  "/api/auth/google/callback",
+  (req, res, next) => {
+    logger.info("Google callback received", {
+      sessionID: req.sessionID,
+      hasSession: !!req.session,
+      query: req.query,
+      error: req.query.error,
+    });
+    next();
+  },
+  passport.authenticate("google", {
+    failureRedirect: "http://localhost:5173/login",
+    failureMessage: true,
+    session: true, // explicitly enable session
+  }),
+  (req, res) => {
+    logger.info("Google auth successful", {
+      user: req.user?._id,
+      sessionID: req.sessionID,
+    });
+    res.redirect("http://localhost:5173/messages");
+  }
 );
 
-app.get('/api/auth/logout', (req, res) => {
-  req.logout(() => {
-    res.json({ success: true });
+app.get("/api/auth/user", (req, res) => {
+  logger.info("Auth check request", {
+    isAuthenticated: req.isAuthenticated?.(),
+    sessionID: req.sessionID,
+    hasSession: !!req.session,
+    hasUser: !!req.user,
+    user: req.user?._id,
   });
+
+  if (!req.isAuthenticated?.()) {
+    logger.info("Auth check failed - not authenticated");
+    return res.status(401).json({ user: null });
+  }
+
+  res.json({ user: req.user });
 });
 
-app.get('/api/auth/user', (req, res) => {
-  res.json({ user: req.user || null });
+// Add after your routes
+app.use((err, req, res, next) => {
+  logger.error("Unhandled error", {
+    error: err.message,
+    stack: err.stack,
+    path: req.path,
+  });
+  res.status(500).json({ error: "Internal server error" });
 });
 
 app.post("/api/login", async (req, res) => {
