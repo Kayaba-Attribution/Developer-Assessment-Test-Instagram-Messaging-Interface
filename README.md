@@ -1,3 +1,54 @@
+## Breaking changes, plan, notes:
++ [ ] remove ig login as entry -> standard username/password
+  - [ ] add google oauth 
+    - [x] passport dep
+    - [x] create google vars
+    - [x] update user model 
+    - [x] update backend
+    - [x] test login for main app
+    - [ ] update front end
+
++ [ ] AgentQL Instagram creation
+  - [ ] Instagram service add register
+  - [ ] test workflow
+  - [ ] get and use custom email
+  - [ ] fill in all other fields
+  - [ ] choose birthday and submit
+  - [ ] wait 5 sec
+    - [ ] extract code from temp email
+    - [ ] input code and wait
+  - [ ] save credentials
+
+
++ modify data schema
+  - [ ] user -> many accounts -> session & many-msgs
+
++ create instagram account
+  - AgentQL routes ig
+  - [x] email creation service
+  - [x] verification code handling
+  - [ ] account creation UI
+    - [ ] x numbers of accounts
+    - [ ] call API route to perform tasks bulk (realtime updates -> later)
+  - perform login on all accounts and save credentials
+
+
+
++ account management 
+  - status API 
+  - select owned accounts
+  + Comments
+    + input text
+    + OpenAI call
+    + parse and show responses
+  - API route actions
+    - accounts, like/reply
+    - like API: load session and like agentQL
+    - comment API: load session and input text
+  + log all (check data schema)
++ logs page
+  + TODO
+
 ### Product Design Document
 
 Product Overview
@@ -24,42 +75,6 @@ General Features
 2.  Maximum Accounts: Up to 100 accounts for initial version
 3.  Default Delay: 20 seconds between actions (adjustable in the UI)
 4.  Generative AI: Utilized for paraphrasing replies.
-
-### Breaking changes, plan, notes:
-+ remove ig login as entry -> standard username/password
-  - add google oauth 
-    - [x] passport dep
-    - [x] create google vars
-    - [x] update user model 
-    - [x] update backend
-    - [x] test login for main app
-    - [ ] update front end
-
-  
-+ modify data schema
-  - user -> many accounts -> session & many-msgs
-+ create instagram account
-  - AgentQL routes ig
-  - email creation service
-  - verification code handling
-  - account creation UI
-    - call API route to perform tasks bulk (realtime updates -> later)
-  - perform login on all accounts and save credentials
-+ account management 
-  - status API 
-  - select owned accounts
-  + Comments
-    + input text
-    + OpenAI call
-    + parse and show responses
-  - API route actions
-    - accounts, like/reply
-    - like API: load session and like agentQL
-    - comment API: load session and input text
-  + log all (check data schema)
-+ logs page
-  + TODO
-
 
 ### Tabs and UI Flow
 
