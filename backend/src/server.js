@@ -14,6 +14,11 @@ const { DIRECTORIES } = require("./config/constants");
 const db = require("./config/database");
 const sessionService = require("./services/sessionService");
 
+// Google Sign
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const session = require("express-session");
+
 const app = express();
 app.use(express.json());
 // Simple CORS setup for development
@@ -47,6 +52,65 @@ async function initialize() {
     throw error;
   }
 }
+
+// Add to initialization
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: "/api/auth/google/callback",
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const user = await sessionService.findOrCreateGoogleUser(profile);
+        done(null, user);
+      } catch (error) {
+        done(error, null);
+      }
+    }
+  )
+);
+
+passport.serializeUser((user, done) => done(null, user.googleId));
+passport.deserializeUser(async (googleId, done) => {
+  try {
+    const user = await sessionService.getOAuthUser(googleId);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+// Add OAuth routes
+app.get('/api/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+app.get('/api/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => res.redirect('/')
+);
+
+app.get('/api/auth/logout', (req, res) => {
+  req.logout(() => {
+    res.json({ success: true });
+  });
+});
+
+app.get('/api/auth/user', (req, res) => {
+  res.json({ user: req.user || null });
+});
 
 app.post("/api/login", async (req, res) => {
   try {

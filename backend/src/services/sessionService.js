@@ -15,6 +15,46 @@ class SessionService {
     return await bcrypt.hash(password, salt);
   }
 
+  // Add new methods for OAuth users
+  async findOrCreateGoogleUser(profile) {
+    try {
+      const users = await this.getCollection();
+
+      const existingUser = await users.findOne({
+        googleId: profile.id,
+      });
+
+      if (existingUser) {
+        return existingUser;
+      }
+
+      const newUser = await users.insertOne({
+        googleId: profile.id,
+        email: profile.emails[0].value,
+        name: profile.displayName,
+        createdAt: new Date(),
+        lastActivity: new Date(),
+        oauthProvider: "google",
+        messages: [],
+      });
+
+      return newUser.ops[0];
+    } catch (error) {
+      logger.error("OAuth user creation error:", error);
+      throw error;
+    }
+  }
+
+  async getOAuthUser(googleId) {
+    try {
+      const users = await this.getCollection();
+      return await users.findOne({ googleId });
+    } catch (error) {
+      logger.error("OAuth user fetch error:", error);
+      return null;
+    }
+  }
+
   // Core method: Create or update user session
   async createOrUpdateSession(username, password, sessionData) {
     try {
@@ -169,7 +209,6 @@ class SessionService {
       return [];
     }
   }
-
 }
 
 module.exports = new SessionService();

@@ -31,7 +31,7 @@ General Features
     - [x] passport dep
     - [x] create google vars
     - [x] update user model 
-    - [ ] update backend
+    - [x] update backend
     - [ ] test login for main app
     - [ ] update front end
 
