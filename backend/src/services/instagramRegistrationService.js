@@ -68,10 +68,14 @@ class InstagramRegistrationService {
 
   // Form Selectors
   initFormSelectors() {
-    return `
-    `
+    return {
+      email: 'input[name="emailOrPhone"]',
+      fullName: 'input[name="fullName"]',
+      username: 'input[name="username"]',
+      password: 'input[name="password"]',
+      signupButton: 'button[type="submit"]',
+    };
   }
-
 
   // Main Registration Flow
   async register() {
@@ -156,12 +160,12 @@ class InstagramRegistrationService {
 
     return page;
   }
-  
 
   // Registration Process
   async performRegistration(page, registrationData) {
     try {
       await this.navigateToSignup(page);
+
       await this.fillRegistrationForm(
         page,
         this.formRegistrationSelectors,
@@ -207,19 +211,11 @@ class InstagramRegistrationService {
         }`
       );
     }
-    
+
     await loginForm.login_form.signup_button.click();
     await page.waitForTimeout(2000);
     await takeScreenshot(page, `move_to_registration`);
-
-    // await page.goto("https://www.instagram.com/accounts/emailsignup/", {
-    //   waitUntil: "networkidle",
-    // });
-    // await page.waitForTimeout(2000);
-    // await takeScreenshot(page, `nav_to_signin`);
-    // logger.info("Navigated to signup page");
   }
-
 
   // Form Handling
   async fillRegistrationForm(page, query, data) {
@@ -232,10 +228,10 @@ class InstagramRegistrationService {
 
   async fillBasicInfo(page, query, data) {
     const fields = [
-      { selector: query.form.email, value: data.email },
-      { selector: query.form.fullName, value: data.fullName },
-      { selector: query.form.username, value: data.username },
-      { selector: query.form.password, value: data.password },
+      { selector: query.email, value: data.email },
+      { selector: query.fullName, value: data.fullName },
+      { selector: query.username, value: data.username },
+      { selector: query.password, value: data.password },
     ];
 
     for (const field of fields) {
@@ -243,6 +239,21 @@ class InstagramRegistrationService {
       await page.fill(field.selector, field.value);
       await page.waitForTimeout(500);
     }
+
+    // Take screenshot before submission
+    await takeScreenshot(page, "registration_form_filled");
+
+    // Click signup button
+    await page.waitForSelector(query.signupButton);
+    await page.click(query.signupButton);
+
+    // Wait for 3 seconds after submission
+    await page.waitForTimeout(3000);
+
+    // Take screenshot after submission
+    await takeScreenshot(page, "registration_submitted");
+
+    logger.info("Form filled and submitted");
   }
 
   getRandomUserAgent() {
