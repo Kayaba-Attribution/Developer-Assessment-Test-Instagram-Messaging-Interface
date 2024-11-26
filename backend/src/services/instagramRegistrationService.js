@@ -101,6 +101,9 @@ class InstagramRegistrationService {
         const page = await this.setupPage(browser);
 
         const result = await this.performRegistration(page, registrationData);
+
+        await browser.close();
+
         if (result.success) {
           return result;
         }
@@ -109,12 +112,7 @@ class InstagramRegistrationService {
       } catch (error) {
         logger.error("Registration error:", error);
         lastError = error;
-      } finally {
-        if (browser) {
-          await browser.close();
-        }
       }
-
       if (attempt === this.maxRetries) {
         return {
           success: false,
@@ -174,12 +172,30 @@ class InstagramRegistrationService {
         registrationData
       );
 
+      
       registrationData.status = "FORM_FILLED";
       this.registrationAttempts.set(
         registrationData.username,
         registrationData
       );
+      
+      logger.info("Registration form filled, waiting for verification code");
+      await page.waitForTimeout(6000);
+      const verificationCode = await this.getVerificationCode(
+        registrationData.emailHash
+      );
+      
+      if (!verificationCode) {
+        logger.error("Verification code not found");
+      }
+      
+      logger.info(`Verification code received: ${verificationCode}`);
+      
+      await page.waitForTimeout(200000);
+      
+      await this.enterVerificationCode(page, verificationCode);
 
+      await page.waitForTimeout(50000);
       return {
         success: true,
         data: registrationData,
@@ -279,6 +295,50 @@ class InstagramRegistrationService {
     logger.info("Form filled and submitted");
   }
 
+  async enterVerificationCode(page, code) {
+    try {
+      logger.info("Entering verification code");
+
+      // Updated selector for confirmation code input
+      const codeInputSelector = 'input[name="email_confirmation_code"]';
+      await page.waitForSelector(codeInputSelector, { timeout: 20000 });
+
+      // Clear any existing value first
+      await page.fill(codeInputSelector, "");
+
+      // Type code with small delays between characters
+      for (const digit of code.toString()) {
+        await page.type(codeInputSelector, digit);
+        await page.waitForTimeout(100);
+      }
+
+      // Take screenshot before clicking next
+      await takeScreenshot(page, "verification_code_entered");
+
+      // Updated selector for the Next button
+      const nextButtonSelector = 'div[role="button"]:has-text("Next")';
+      await page.waitForSelector(nextButtonSelector);
+      await page.click(nextButtonSelector);
+
+      // Wait for submission and potential navigation
+      await Promise.race([
+        page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
+        page.waitForTimeout(20000),
+      ]);
+
+      await page.waitForTimeout(3000);
+
+      await takeScreenshot(page, "verification_code_submitted");
+      logger.info("Verification code submitted successfully");
+
+      await page.waitForTimeout(40000);
+
+    } catch (error) {
+      logger.error("Error entering verification code:", error);
+      await takeScreenshot(page, "verification_code_error");
+      throw error;
+    }
+  }
   getRandomUserAgent() {
     const userAgents = [
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
@@ -346,6 +406,31 @@ class InstagramRegistrationService {
       throw error;
     }
   }
+
+  async getVerificationCode(emailHash) {
+    try {
+      const emails = await tempMailService.getEmails(emailHash);
+
+      const sortedEmails = emails.sort(
+        (a, b) => b.mail_timestamp - a.mail_timestamp
+      );
+
+      // logger.debug("Emails received:", sortedEmails);
+
+      for (const email of sortedEmails) {
+        const code = tempMailService.extractVerificationCode(
+          email.mail_subject
+        );
+        if (code) {
+          return code;
+        }
+      }
+    } catch (error) {
+      logger.error("Error getting verification code:", error.message);
+      throw error;
+    }
+  }
+
   // Data Generation
   prepareRegistrationData() {
     const emailData = tempMailService.generateEmail();

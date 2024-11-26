@@ -6,7 +6,6 @@ class FreeProxyService {
   constructor() {
     // Known working proxies
     this.knownProxies = [
-      { server: "http://116.203.27.109:80", type: "http", isKnown: true },
       { server: "http://8.213.128.90:8192", type: "http", isKnown: true },
       { server: "http://47.91.29.151:9098", type: "http", isKnown: true },
       { server: "http://8.213.195.191:3333", type: "http", isKnown: true },

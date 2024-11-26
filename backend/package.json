@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "PORT=3000 node src/server.js"
+    "start": "PORT=3000 node src/server.js",
+    "findProxies": "node src/services/findProxies.js"
   },
   "keywords": [],
   "author": "",
