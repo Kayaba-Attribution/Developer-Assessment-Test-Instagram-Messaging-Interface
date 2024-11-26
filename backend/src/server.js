@@ -53,13 +53,6 @@ async function initialize() {
     // Run initial cleanup
     await cleanup();
 
-    // Schedule periodic cleanups
-    setInterval(cleanup, 60 * 60 * 1000); // Cleanup files every hour
-    setInterval(
-      () => sessionService.cleanupExpiredSessions(),
-      6 * 60 * 60 * 1000
-    ); // Cleanup sessions every 6 hours
-
     return true;
   } catch (error) {
     logger.error("Initialization failed:", error);

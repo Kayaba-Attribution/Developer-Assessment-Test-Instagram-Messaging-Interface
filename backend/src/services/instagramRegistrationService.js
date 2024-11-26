@@ -1,78 +1,173 @@
 const tempMailService = require("./tempMail");
 const logger = require("../utils/logger");
 const crypto = require("crypto");
-const { wrap, configure } = require("agentql");
-const { config, isDev } = require("../config");
+const { wrap } = require("agentql");
+const { config } = require("../config");
 const { chromium } = require("playwright");
-
-const {
-  takeScreenshot,
-  saveSessionToFile,
-  loadSessionFromFile,
-} = require("../utils/files");
+const freeProxyService = require("./freeProxyService");
+const proxyTester = require("./proxyTester");
+const { takeScreenshot } = require("../utils/files");
+const { log } = require("console");
+const { init, move } = require("../server");
+const { QUERIES } = require("../config/constants");
 
 class InstagramRegistrationService {
   constructor() {
     this.registrationAttempts = new Map();
+    this.maxRetries = 1;
+    this.browserConfig = this.initBrowserConfig();
+    this.formRegistrationSelectors = this.initFormSelectors();
+    this.signUpSelector = `{
+    signup_button
+    }`;
     logger.info("Instagram Registration Service initialized");
   }
 
-  async register() {
-    let browser;
-    try {
-      // Generate registration data
-      const registrationData = this.prepareRegistrationData();
-      logger.info(
-        `Prepared registration data for ${registrationData.username}`
-      );
-
-      browser = await chromium.launch({
-        headless: config.headless,
-        args: config.browserOptions.args,
-      });
-
-      const context = await browser.newContext({
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+  // Browser Configuration
+  initBrowserConfig() {
+    return {
+      contextOptions: {
+        userAgent: this.getRandomUserAgent(),
         viewport: { width: 1280, height: 720 },
-      });
+        deviceScaleFactor: 1,
+        hasTouch: false,
+        isMobile: false,
+        locale: "en-US",
+        timezoneId: "America/New_York",
+        permissions: ["geolocation"],
+      },
+      stealthScript: () => {
+        Object.defineProperty(navigator, "webdriver", { get: () => false });
+        Object.defineProperty(navigator, "plugins", {
+          get: () => [1, 2, 3, 4, 5],
+        });
 
-      const page = await wrap(await context.newPage());
-      logger.info("Browser and context initialized");
+        // Add Chrome runtime
+        window.chrome = {
+          runtime: {},
+          loadTimes: () => {},
+          csi: () => {},
+          app: {},
+        };
 
-      // Navigate to signup page
-      await page.goto("https://www.instagram.com/accounts/emailsignup/", {
-        waitUntil: "networkidle",
-      });
+        // Override permissions
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = async (parameters) => {
+          if (parameters.name === "notifications") {
+            return { state: Notification.permission };
+          }
+          return originalQuery(parameters);
+        };
 
-      await page.waitForTimeout(2000);
-      logger.info("Navigated to signup page");
+        // Add custom navigator properties
+        Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+        Object.defineProperty(navigator, "language", { get: () => "en-US" });
+      },
+    };
+  }
 
-      // Using AgentQL query format for better readability and maintainability
-      const SIGNUP_QUERY = {
-        form: {
-          email: 'input[name="emailOrPhone"]',
-          fullName: 'input[name="fullName"]',
-          username: 'input[name="username"]',
-          password: 'input[name="password"]',
-          birthdayMonth: 'select[title="Month:"]',
-          birthdayDay: 'select[title="Day:"]',
-          birthdayYear: 'select[title="Year:"]',
-          submit: 'button[type="submit"]',
-        },
-      };
+  // Form Selectors
+  initFormSelectors() {
+    return `
+    `
+  }
 
-      // Fill form using AgentQL approach
-      await this.fillRegistrationForm(page, SIGNUP_QUERY, registrationData);
-      logger.info("Form filled successfully");
 
-      // Take screenshot of filled form
-      await takeScreenshot(
+  // Main Registration Flow
+  async register() {
+    let attempt = 0;
+    let lastError = null;
+
+    while (attempt < this.maxRetries) {
+      let browser;
+      let proxy;
+
+      try {
+        attempt++;
+        logger.info(`Registration attempt ${attempt} of ${this.maxRetries}`);
+
+        proxy = await this.getVerifiedProxy();
+        const registrationData = this.prepareRegistrationData();
+        browser = await chromium.launch({
+          headless: config.headless,
+          args: config.browserOptions.args,
+        });
+        const page = await this.setupPage(browser);
+
+        const result = await this.performRegistration(page, registrationData);
+        if (result.success) {
+          return result;
+        }
+
+        lastError = new Error(result.error);
+      } catch (error) {
+        logger.error("Registration error:", error);
+        lastError = error;
+      } finally {
+        if (browser) {
+          await browser.close();
+        }
+      }
+
+      if (attempt === this.maxRetries) {
+        return {
+          success: false,
+          error: lastError.message,
+        };
+      }
+    }
+  }
+
+  // Proxy Handling
+  async getVerifiedProxy() {
+    while (true) {
+      const proxy = await freeProxyService.getProxy();
+      logger.info(`Testing proxy: ${proxy.server}`);
+
+      const isValid = await proxyTester.testProxy(proxy);
+      if (isValid) {
+        logger.info(`Found working proxy: ${proxy.server}`);
+        return proxy;
+      }
+
+      logger.warn(`Proxy ${proxy.server} failed testing, trying another...`);
+    }
+  }
+
+  // Browser Setup
+  async initBrowser() {
+    const browser = await chromium.launch({
+      headless: config.headless,
+      args: config.browserOptions.args,
+    });
+
+    return browser;
+  }
+
+  async setupPage(browser) {
+    const context = await browser.newContext(this.browserConfig.contextOptions);
+    await context.addInitScript(this.browserConfig.stealthScript);
+
+    const page = await wrap(await context.newPage());
+
+    // Random mouse movements and delays
+    await this.simulateHumanBehavior(page);
+    logger.info("Browser and context initialized");
+
+    return page;
+  }
+  
+
+  // Registration Process
+  async performRegistration(page, registrationData) {
+    try {
+      await this.navigateToSignup(page);
+      await this.fillRegistrationForm(
         page,
-        `registration_form_${registrationData.username}`
+        this.formRegistrationSelectors,
+        registrationData
       );
 
-      // Update registration status
       registrationData.status = "FORM_FILLED";
       this.registrationAttempts.set(
         registrationData.username,
@@ -84,75 +179,106 @@ class InstagramRegistrationService {
         data: registrationData,
       };
     } catch (error) {
-      logger.error("Registration error:", error);
       return {
         success: false,
         error: error.message,
       };
-    } finally {
-      if (browser) {
-        await browser.close();
-      }
     }
   }
 
-  async fillRegistrationForm(page, query, data) {
-    logger.error(`FORM DATA: ${JSON.stringify(data, null, 2)}`);
-    // Wait for and fill email
-    await page.waitForSelector(query.form.email);
-    await page.fill(query.form.email, data.email);
-    await page.waitForTimeout(500);
-
-    // Wait for and fill full name
-    await page.waitForSelector(query.form.fullName);
-    await page.fill(query.form.fullName, data.fullName);
-    await page.waitForTimeout(500);
-
-    // Wait for and fill username
-    await page.waitForSelector(query.form.username);
-    await page.fill(query.form.username, data.username);
-    await page.waitForTimeout(500);
-
-    // Wait for and fill password
-    await page.waitForSelector(query.form.password);
-    await page.fill(query.form.password, data.password);
-    await page.waitForTimeout(500);
-
-    // Click on signup button
-    await page.click(query.form.submit);
+  async navigateToSignup(page) {
+    logger.info("Navigating to Instagram signup page");
+    await page.goto("https://www.instagram.com/", {
+      waitUntil: "networkidle",
+      timeout: 30000,
+    });
+    await takeScreenshot(page, `nav_to_instagram`);
     await page.waitForTimeout(2000);
+    logger.info("Navigated to Instagram homepage, navigating to signup page");
 
-    // Set birthday
+    // Click on Sign Up button
+    const loginForm = await page.queryElements(QUERIES.LOGIN_FORM);
+
+    if (!loginForm?.login_form?.username_input) {
+      const screenshot = await takeScreenshot(page, "login_form_error");
+      throw new Error(
+        `Login form not found${
+          screenshot ? `. Screenshot saved: ${screenshot}` : ""
+        }`
+      );
+    }
+    
+    await loginForm.login_form.signup_button.click();
+    await page.waitForTimeout(2000);
+    await takeScreenshot(page, `move_to_registration`);
+
+    // await page.goto("https://www.instagram.com/accounts/emailsignup/", {
+    //   waitUntil: "networkidle",
+    // });
+    // await page.waitForTimeout(2000);
+    // await takeScreenshot(page, `nav_to_signin`);
+    // logger.info("Navigated to signup page");
+  }
+
+
+  // Form Handling
+  async fillRegistrationForm(page, query, data) {
+    logger.info(`Filling form with data: ${JSON.stringify(data, null, 2)}`);
+
+    await this.fillBasicInfo(page, query, data);
+    await this.setBirthday(page, query, data.birthday);
+    await this.submitForm(page, query);
+  }
+
+  async fillBasicInfo(page, query, data) {
+    const fields = [
+      { selector: query.form.email, value: data.email },
+      { selector: query.form.fullName, value: data.fullName },
+      { selector: query.form.username, value: data.username },
+      { selector: query.form.password, value: data.password },
+    ];
+
+    for (const field of fields) {
+      await page.waitForSelector(field.selector);
+      await page.fill(field.selector, field.value);
+      await page.waitForTimeout(500);
+    }
+  }
+
+  getRandomUserAgent() {
+    const userAgents = [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0",
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+  }
+
+  async simulateHumanBehavior(page) {
+    await page.mouse.move(Math.random() * 1920, Math.random() * 1080, {
+      steps: 10,
+    });
+    await page.waitForTimeout(Math.random() * 1000 + 500);
+  }
+
+  async setBirthday(page, query, birthday) {
     await page.selectOption(
       query.form.birthdayMonth,
-      data.birthday.month.toString()
+      birthday.month.toString()
     );
-    await page.selectOption(
-      query.form.birthdayDay,
-      data.birthday.day.toString()
-    );
-    await page.selectOption(
-      query.form.birthdayYear,
-      data.birthday.year.toString()
-    );
+    await page.selectOption(query.form.birthdayDay, birthday.day.toString());
+    await page.selectOption(query.form.birthdayYear, birthday.year.toString());
     await page.waitForTimeout(1000);
-
-    // Click on next button
-    await page.click(query.form.submit);
-    await page.waitForTimeout(2000);
-
-    const nextButton = await page.queryElements(
-      `{
-        nextButton: 'button[type="submit"]'
-        }`
-    );
-
-    if (nextButton.nextButton) {
-      await page.click(nextButton.nextButton);
-      await page.waitForTimeout(2000);
-    }
   }
 
+  async submitForm(page, query) {
+    await page.click(query.form.submit);
+    await page.waitForTimeout(2000);
+    await takeScreenshot(page, `registration_form_submitted`);
+  }
+
+  // Data Generation
   prepareRegistrationData() {
     const emailData = tempMailService.generateEmail();
     const emailPrefix = emailData.email.split("@")[0];
@@ -192,6 +318,7 @@ class InstagramRegistrationService {
     return { year, month, day };
   }
 
+  // Status Management
   getRegistrationStatus(username) {
     return this.registrationAttempts.get(username);
   }

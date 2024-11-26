@@ -10,16 +10,25 @@ const config = {
     headless: false,
     saveScreenshots: true,
     cleanupOldFiles: true,
-    cleanupThreshold: 24, // hours
+    cleanupThreshold: 0, // hours
     screenshotsDir: path.join(process.cwd(), "debug_screenshots"),
     sessionsDir: path.join(process.cwd(), "sessions"),
     logsDir: path.join(process.cwd(), "logs"),
     browserOptions: {
       args: [
-        "--disable-blink-features=AutomationControlled",
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
         "--disable-web-security",
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-infobars',
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
+        '--ignore-certificate-errors',
+        '--no-first-run',
+        '--no-service-autorun',
+        '--password-store=basic',
+        '--no-zygote',
+        '--window-size=1280,720',
+        '--start-maximized'
       ],
     },
     logRetention: {

@@ -19,8 +19,19 @@
     - [ ] extract code from temp email
     - [ ] input code and wait
 
+your code is 123456
+curl -X POST http://localhost:3000/api/instagram/register -H "Content-Type: application/json"
+curl -X POST http://localhost:3000/api/mail/create -H "Content-Type: application/json"
+curl -X GET "http://localhost:3000/api/mail/messages/a913d1f1b8db078097d23b1023c2ba4d"
+
+100, 1000
 
   - [ ] save credentials
+
+  email
+  verification code
+
+
 
 
 + modify data schema
@@ -41,6 +52,48 @@ Free tier: 100 req/day
 Pro tier: $19/mo 5000 req/day
 + https://rapidapi.com/Privatix/api/temp-mail/pricing
 
+### idea for check and AgentQL Integration
+```mermaid
+stateDiagram-v2
+    [*] --> CronJob
+    CronJob --> CheckAPI: Trigger
+    CheckAPI --> LinkedInScraping: Start Scraping
+    LinkedInScraping --> XMLMatchers: Apply Matchers
+    
+    XMLMatchers --> Success: Match Found
+    XMLMatchers --> Fallback: Error/No Match
+    
+    Fallback --> AgentQL: Use AgentQL
+    AgentQL --> NewXMLPath: Find New Path
+    NewXMLPath --> RerunScraping: Try New Path
+    
+    RerunScraping --> VerifyResults: Verify
+    VerifyResults --> SaveNewPath: Success
+    VerifyResults --> RetryCheck: Failure
+    
+    RetryCheck --> Retry: Attempts < 3
+    RetryCheck --> HighPriorityLog: Attempts >= 3
+    Retry --> RerunScraping: Try Again
+    
+    SaveNewPath --> [*]
+    HighPriorityLog --> [*]
+    Success --> [*]
+
+    note right of Fallback
+        AgentQL used as fallback
+        to find new XML paths
+    end note
+
+    note right of RetryCheck
+        Check retry count
+        Max attempts: 3
+    end note
+
+    note right of HighPriorityLog
+        Log failure after
+        3 failed attempts
+    end note
+```
 
 + account management 
   - status API 

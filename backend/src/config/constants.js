@@ -5,6 +5,7 @@ const QUERIES = {
         username_input
         password_input
         login_button
+        signup_button
       }
     }`,
   ERROR_MESSAGE: `{
@@ -28,6 +29,7 @@ const QUERIES = {
       first_message_input
       first_chat_button
     }`,
+  
 };
 
 const DIRECTORIES = ["debug_screenshots", "sessions", "logs"];
