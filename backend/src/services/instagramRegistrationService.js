@@ -17,9 +17,7 @@ class InstagramRegistrationService {
     this.maxRetries = 1;
     this.browserConfig = this.initBrowserConfig();
     this.formRegistrationSelectors = this.initFormSelectors();
-    this.signUpSelector = `{
-    signup_button
-    }`;
+    this.signUpSelector = 'a[href="/accounts/emailsignup/"]';
     logger.info("Instagram Registration Service initialized");
   }
 
@@ -74,6 +72,10 @@ class InstagramRegistrationService {
       username: 'input[name="username"]',
       password: 'input[name="password"]',
       signupButton: 'button[type="submit"]',
+      birthdayMonth: 'select[title="Month:"]',
+      birthdayDay: 'select[title="Day:"]',
+      birthdayYear: 'select[title="Year:"]',
+      submit: ['button[type="button"]', 'button:contains("Next")'],
     };
   }
 
@@ -197,24 +199,61 @@ class InstagramRegistrationService {
       timeout: 30000,
     });
     await takeScreenshot(page, `nav_to_instagram`);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(1000);
     logger.info("Navigated to Instagram homepage, navigating to signup page");
 
-    // Click on Sign Up button
-    const loginForm = await page.queryElements(QUERIES.LOGIN_FORM);
+    // // Click on Sign Up button
+    // const loginForm = await page.queryElements(QUERIES.LOGIN_FORM);
 
-    if (!loginForm?.login_form?.username_input) {
-      const screenshot = await takeScreenshot(page, "login_form_error");
-      throw new Error(
-        `Login form not found${
-          screenshot ? `. Screenshot saved: ${screenshot}` : ""
-        }`
-      );
+    // if (!loginForm?.login_form?.username_input) {
+    //   const screenshot = await takeScreenshot(page, "login_form_error");
+    //   throw new Error(
+    //     `Login form not found${
+    //       screenshot ? `. Screenshot saved: ${screenshot}` : ""
+    //     }`
+    //   );
+    // }
+
+    // await loginForm.login_form.signup_button.click();
+    // await page.waitForTimeout(2000);
+    // await takeScreenshot(page, `move_to_registration`);
+
+    try {
+      // Wait for selector with timeout
+      await page.waitForSelector(this.signUpSelector, { timeout: 5000 });
+
+      // Ensure element is visible and clickable
+      const signUpLink = await page.$(this.signUpSelector);
+      if (!signUpLink) {
+        logger.error("Submit button not found");
+      }
+
+      // Check visibility
+      const isVisible = await signUpLink.isVisible();
+      if (!isVisible) {
+        throw new Error("Sign up link is not visible");
+      }
+
+      // Click the button
+      await signUpLink.click();
+
+      // Wait for navigation or next state
+      await Promise.race([
+        page
+          .waitForNavigation({ waitUntil: "networkidle0", timeout: 5000 })
+          .catch(() => {}),
+        page.waitForTimeout(2000),
+      ]);
+
+      // Take screenshot
+      await takeScreenshot(page, "navigated_to_registration");
+
+      return true;
+    } catch (error) {
+      logger.error("Form submission failed:", error.message);
+      await takeScreenshot(page, "registration_nav_error");
+      throw error;
     }
-
-    await loginForm.login_form.signup_button.click();
-    await page.waitForTimeout(2000);
-    await takeScreenshot(page, `move_to_registration`);
   }
 
   // Form Handling
@@ -274,21 +313,54 @@ class InstagramRegistrationService {
   }
 
   async setBirthday(page, query, birthday) {
-    await page.selectOption(
-      query.form.birthdayMonth,
-      birthday.month.toString()
-    );
-    await page.selectOption(query.form.birthdayDay, birthday.day.toString());
-    await page.selectOption(query.form.birthdayYear, birthday.year.toString());
+    await page.selectOption(query.birthdayMonth, birthday.month.toString());
+    await page.waitForTimeout(100);
+    await page.selectOption(query.birthdayDay, birthday.day.toString());
+    await page.waitForTimeout(100);
+    await page.selectOption(query.birthdayYear, birthday.year.toString());
     await page.waitForTimeout(1000);
   }
 
   async submitForm(page, query) {
-    await page.click(query.form.submit);
-    await page.waitForTimeout(2000);
-    await takeScreenshot(page, `registration_form_submitted`);
-  }
+    try {
+      // Wait for selector with timeout
+      await page.waitForSelector(query.submit, { timeout: 5000 });
 
+      // Ensure element is visible and clickable
+      const submitButton = await page.$(query.submit);
+      if (!submitButton) {
+        logger.error("Submit button not found");
+      }
+
+      // Check if button is visible and enabled
+      const isVisible = await submitButton.isVisible();
+      const isEnabled = await submitButton.isEnabled();
+
+      if (!isVisible || !isEnabled) {
+        logger.error("Submit button is not clickable");
+      }
+
+      // Click the button
+      await submitButton.click();
+
+      // Wait for navigation or next state
+      await Promise.race([
+        page
+          .waitForNavigation({ waitUntil: "networkidle0", timeout: 5000 })
+          .catch(() => {}),
+        page.waitForTimeout(2000),
+      ]);
+
+      // Take screenshot
+      await takeScreenshot(page, "registration_form_submitted");
+
+      return true;
+    } catch (error) {
+      logger.error("Form submission failed:", error.message);
+      await takeScreenshot(page, "form_submission_error");
+      throw error;
+    }
+  }
   // Data Generation
   prepareRegistrationData() {
     const emailData = tempMailService.generateEmail();
