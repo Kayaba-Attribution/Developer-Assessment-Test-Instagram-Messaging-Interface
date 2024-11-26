@@ -75,7 +75,7 @@ class InstagramRegistrationService {
       birthdayMonth: 'select[title="Month:"]',
       birthdayDay: 'select[title="Day:"]',
       birthdayYear: 'select[title="Year:"]',
-      submit: ['button[type="button"]', 'button:contains("Next")'],
+      next: 'button[type="button"]:has-text("Next")',
     };
   }
 
@@ -202,22 +202,6 @@ class InstagramRegistrationService {
     await page.waitForTimeout(1000);
     logger.info("Navigated to Instagram homepage, navigating to signup page");
 
-    // // Click on Sign Up button
-    // const loginForm = await page.queryElements(QUERIES.LOGIN_FORM);
-
-    // if (!loginForm?.login_form?.username_input) {
-    //   const screenshot = await takeScreenshot(page, "login_form_error");
-    //   throw new Error(
-    //     `Login form not found${
-    //       screenshot ? `. Screenshot saved: ${screenshot}` : ""
-    //     }`
-    //   );
-    // }
-
-    // await loginForm.login_form.signup_button.click();
-    // await page.waitForTimeout(2000);
-    // await takeScreenshot(page, `move_to_registration`);
-
     try {
       // Wait for selector with timeout
       await page.waitForSelector(this.signUpSelector, { timeout: 5000 });
@@ -225,7 +209,7 @@ class InstagramRegistrationService {
       // Ensure element is visible and clickable
       const signUpLink = await page.$(this.signUpSelector);
       if (!signUpLink) {
-        logger.error("Submit button not found");
+        logger.error("Signup button not found");
       }
 
       // Check visibility
@@ -262,7 +246,7 @@ class InstagramRegistrationService {
 
     await this.fillBasicInfo(page, query, data);
     await this.setBirthday(page, query, data.birthday);
-    await this.submitForm(page, query);
+    await this.submitAgeForm(page, query);
   }
 
   async fillBasicInfo(page, query, data) {
@@ -321,27 +305,28 @@ class InstagramRegistrationService {
     await page.waitForTimeout(1000);
   }
 
-  async submitForm(page, query) {
+  async submitAgeForm(page, query) {
     try {
+      await page.waitForTimeout(1000);
       // Wait for selector with timeout
-      await page.waitForSelector(query.submit, { timeout: 5000 });
+      await page.waitForSelector(query.next, { timeout: 5000 });
 
       // Ensure element is visible and clickable
-      const submitButton = await page.$(query.submit);
-      if (!submitButton) {
-        logger.error("Submit button not found");
+      const nextBtn = await page.$(query.next);
+      if (!nextBtn) {
+        logger.error("Next button not found");
       }
 
       // Check if button is visible and enabled
-      const isVisible = await submitButton.isVisible();
-      const isEnabled = await submitButton.isEnabled();
+      const isVisible = await nextBtn.isVisible();
+      const isEnabled = await nextBtn.isEnabled();
 
       if (!isVisible || !isEnabled) {
-        logger.error("Submit button is not clickable");
+        logger.error("Next button is not clickable");
       }
 
       // Click the button
-      await submitButton.click();
+      await nextBtn.click();
 
       // Wait for navigation or next state
       await Promise.race([
@@ -352,12 +337,12 @@ class InstagramRegistrationService {
       ]);
 
       // Take screenshot
-      await takeScreenshot(page, "registration_form_submitted");
+      await takeScreenshot(page, "next_form_submission_submitted");
 
       return true;
     } catch (error) {
       logger.error("Form submission failed:", error.message);
-      await takeScreenshot(page, "form_submission_error");
+      await takeScreenshot(page, "next_form_submission_error");
       throw error;
     }
   }
