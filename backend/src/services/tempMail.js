@@ -8,16 +8,16 @@ const logger = require("../utils/logger");
 class TempMailService {
   constructor(firstNamesFile = "first-name.txt", lastNamesFile = "last-name.txt") {
     this.domains = [
-      "@cevipsa.com",
-      "@cpav3.com",
-      "@nuclene.com",
-      "@steveix.com",
-      "@mocvn.com",
-      "@tenvil.com",
+      // "@cevipsa.com",
+      // "@cpav3.com",
+      // "@nuclene.com",
+      // "@steveix.com",
+      // "@mocvn.com",
+      // "@tenvil.com",
       "@tgvis.com",
-      "@amozix.com",
-      "@anypsd.com",
-      "@maxric.com",
+      // "@amozix.com",
+      // "@anypsd.com",
+      // "@maxric.com",
     ];
     this.rapidApiKey =
       process.env.RAPID_API_KEY ||

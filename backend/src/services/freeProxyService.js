@@ -1,16 +1,28 @@
 // freeProxyService.js
 const axios = require("axios");
 const logger = require("../utils/logger");
+const fs = require("fs");
+const path = require('path');
 
 class FreeProxyService {
   constructor() {
-    // Known working proxies
-    this.knownProxies = [
-      { server: "http://8.213.128.90:8192", type: "http", isKnown: true },
-      { server: "http://47.91.29.151:9098", type: "http", isKnown: true },
-      { server: "http://8.213.195.191:3333", type: "http", isKnown: true },
-      { server: "http://59.124.71.14:80", type: "http", isKnown: true },
-    ];
+    // Load known proxies from a JSON file
+    try {
+      const proxyPath = path.join(
+        __dirname,
+        "..",
+        "..",
+        "working-proxies.json"
+      );
+      const data = fs.readFileSync(proxyPath, "utf8");
+      this.knownProxies = JSON.parse(data);
+      logger.info(
+        `Loaded ${this.knownProxies.length} known proxies from JSON file`
+      );
+    } catch (error) {
+      logger.error("Error loading known proxies from JSON file:", error);
+      this.knownProxies = [];
+    }
 
     this.proxyList = [...this.knownProxies];
     this.lastFetch = 0;

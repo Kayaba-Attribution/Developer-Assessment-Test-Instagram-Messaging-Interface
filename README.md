@@ -1,38 +1,61 @@
-## Breaking changes, plan, notes:
-+ [ ] remove ig login as entry -> standard username/password
-  - [ ] add google oauth 
-    - [x] passport dep
-    - [x] create google vars
-    - [x] update user model 
-    - [x] update backend
-    - [x] test login for main app
-    - [ ] update front end
+#### Testing
 
-+ [ ] AgentQL Instagram creation
-  - [X] Instagram service add register
-  - [X] test workflow
-  - [X] get and use custom email
-  - [X] fill in all other fields
-  - [X] choose birthday and submit
-    - ! requery elements and click submit
-  - [X] wait 5 sec
-    - [ ] extract code from temp email
-    - [ ] input code and wait
+**Full creation sequence:**
+`curl -X POST http://localhost:3000/api/instagram/register -H "Content-Type: application/json"`
 
-your code is 123456
-curl -X POST http://localhost:3000/api/instagram/register -H "Content-Type: application/json"
-curl -X POST http://localhost:3000/api/mail/create -H "Content-Type: application/json"
-curl -X GET "http://localhost:3000/api/mail/messages/a913d1f1b8db078097d23b1023c2ba4d"
+##### Create a new email:
+`curl -X POST http://localhost:3000/api/mail/create -H "Content-Type: application/json"`
 
-100, 1000
+##### Get the latest code given an email Md5 hash
+`curl -X GET "http://localhost:3000/api/mail/messages/<hash>"`
 
-  - [ ] save credentials
+curl -X GET "http://localhost:3000/api/mail/code/7d34dcac2824ea43235ccc884fbeae13"
+##### Get new set of working proxies:
 
-  email
-  verification code
+http://185.206.71.91:9090 -> worked
+
+{"id":"bb32b8b30906d7018958ea75537627ef","from":"\"Instagram\" <security@mail.instagram.com>","subject":"Verify your account","timestamp":1732659380.242,"verificationCode":null},{"id":"42d44ff31136f9114b42fc46537496a7","from":"\"Instagram\" <security@mail.instagram.com>","subject":"Verify your account","timestamp":1732659565.548,"verificationCode":null}
+
+info: Filling form with data: {
+  "email": "manish.winhold.b2f819af@tgvis.com",
+  "emailHash": "7d34dcac2824ea43235ccc884fbeae13",
+  "username": "manish.winhold.b2f819af_9445",
+  "fullName": "nthenya karen",
+  "password": "d69dd05a5c541b2f!1A",
+  "birthday": {
+    "year": 1992,
+    "month": 3,
+    "day":
+
+`npm run findProxies`  
+
+```js
+Found proxies: [
+  { server: 'http://185.206.71.91:9090', type: 'http', isKnown: false },
+  { server: 'http://47.238.128.246:100', type: 'http', isKnown: false },
+  { server: 'http://8.219.97.248:80', type: 'http', isKnown: false },
+  { server: 'http://204.57.112.5:80', type: 'http', isKnown: false },
+  { server: 'http://47.119.164.33:8080', type: 'http', isKnown: false },
+  { server: 'http://8.221.139.222:8008', type: 'http', isKnown: false },
+  { server: 'http://44.195.247.145:80', type: 'http', isKnown: false },
+  { server: 'http://39.102.208.23:8081', type: 'http', isKnown: false },
+  { server: 'http://157.254.53.50:80', type: 'http', isKnown: false },
+  { server: 'http://8.220.205.172:9098', type: 'http', isKnown: false }
+]
+```
+
+### Blocker:
++ Accounts are being suspended upon creation
+  + implemented proxies and rotation
+  + make changes to the interactions
+  + ip? -> might be blacklisted
+    + look into ip rotation
+  + maybe is the email domain?
+
+_if more than half a day -> manually create and move to interactions_
 
 
-
+## Changes, plan, status, notes:
 
 + modify data schema
   - [ ] user -> many accounts -> session & many-msgs
@@ -46,56 +69,7 @@ curl -X GET "http://localhost:3000/api/mail/messages/a913d1f1b8db078097d23b1023c
     - [ ] call API route to perform tasks bulk (realtime updates -> later)
   - perform login on all accounts and save credentials
 
-
-**using https://temp-mail.org/en/api**
-Free tier: 100 req/day
-Pro tier: $19/mo 5000 req/day
-+ https://rapidapi.com/Privatix/api/temp-mail/pricing
-
-### idea for check and AgentQL Integration
-```mermaid
-stateDiagram-v2
-    [*] --> CronJob
-    CronJob --> CheckAPI: Trigger
-    CheckAPI --> LinkedInScraping: Start Scraping
-    LinkedInScraping --> XMLMatchers: Apply Matchers
-    
-    XMLMatchers --> Success: Match Found
-    XMLMatchers --> Fallback: Error/No Match
-    
-    Fallback --> AgentQL: Use AgentQL
-    AgentQL --> NewXMLPath: Find New Path
-    NewXMLPath --> RerunScraping: Try New Path
-    
-    RerunScraping --> VerifyResults: Verify
-    VerifyResults --> SaveNewPath: Success
-    VerifyResults --> RetryCheck: Failure
-    
-    RetryCheck --> Retry: Attempts < 3
-    RetryCheck --> HighPriorityLog: Attempts >= 3
-    Retry --> RerunScraping: Try Again
-    
-    SaveNewPath --> [*]
-    HighPriorityLog --> [*]
-    Success --> [*]
-
-    note right of Fallback
-        AgentQL used as fallback
-        to find new XML paths
-    end note
-
-    note right of RetryCheck
-        Check retry count
-        Max attempts: 3
-    end note
-
-    note right of HighPriorityLog
-        Log failure after
-        3 failed attempts
-    end note
-```
-
-+ account management 
+  + account management 
   - status API 
   - select owned accounts
   + Comments
@@ -109,6 +83,39 @@ stateDiagram-v2
   + log all (check data schema)
 + logs page
   + TODO
+
+
+### Completed:
+
++ [X] remove ig login as entry -> standard username/password
+  - [X] add google oauth 
+    - [x] passport dep
+    - [x] create google vars
+    - [x] update user model 
+    - [x] update backend
+    - [x] test login for main app
+    - [X] update front end
+
++ [X] AgentQL Instagram creation
+  - [X] Instagram service add register
+  - [X] test workflow
+  - [X] get and use custom email
+  - [X] fill in all other fields
+  - [X] choose birthday and submit
+    - ! requery elements and click submit
+  - [X] wait 5 sec
+    - [X] extract code from temp email
+    - [X] input code and wait
+
+  - [ ] save credentials
+
+
+**using [Temp-mail API](https://temp-mail.org/en/api)**
++ Free tier: 100 req/day
++ Pro tier: $19/mo 5000 req/day
++ [Pricing] https://rapidapi.com/Privatix/api/temp-mail/pricing
+
+
 
 ### Product Design Document
 
@@ -263,3 +270,49 @@ Components:
 #### 3. Additional Actions:
 
 - Support for follow/unfollow, post liking, and direct messaging.
+
+
+
+### idea for check and AgentQL Integration
+```mermaid
+stateDiagram-v2
+    [*] --> CronJob
+    CronJob --> CheckAPI: Trigger
+    CheckAPI --> LinkedInScraping: Start Scraping
+    LinkedInScraping --> XMLMatchers: Apply Matchers
+    
+    XMLMatchers --> Success: Match Found
+    XMLMatchers --> Fallback: Error/No Match
+    
+    Fallback --> AgentQL: Use AgentQL
+    AgentQL --> NewXMLPath: Find New Path
+    NewXMLPath --> RerunScraping: Try New Path
+    
+    RerunScraping --> VerifyResults: Verify
+    VerifyResults --> SaveNewPath: Success
+    VerifyResults --> RetryCheck: Failure
+    
+    RetryCheck --> Retry: Attempts < 3
+    RetryCheck --> HighPriorityLog: Attempts >= 3
+    Retry --> RerunScraping: Try Again
+    
+    SaveNewPath --> [*]
+    HighPriorityLog --> [*]
+    Success --> [*]
+
+    note right of Fallback
+        AgentQL used as fallback
+        to find new XML paths
+    end note
+
+    note right of RetryCheck
+        Check retry count
+        Max attempts: 3
+    end note
+
+    note right of HighPriorityLog
+        Log failure after
+        3 failed attempts
+    end note
+```
+
