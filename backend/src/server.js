@@ -1,45 +1,45 @@
 // src/server.js
 require("dotenv").config();
 const express = require("express");
+const container = require("./container");
 const configureExpress = require("./config/express.config");
-const configurePassport = require("./config/passport.config");
-const db = require("./config/database");
-const logger = require("./utils/logger");
 
-// Import routes
-const authRoutes = require("./api/v1/routes/auth.routes");
-
-const app = express();
-
-// Configure Express and Passport
-configureExpress(app);
-configurePassport();
-
-// API routes
-app.use("/api/v1/auth", authRoutes);
-
-// Error handler
-app.use((err, req, res, next) => {
-  logger.error("Unhandled error", {
-    error: err.message,
-    stack: err.stack,
-    path: req.path,
-  });
-  res.status(500).json({ error: "Internal server error" });
-});
-
-// Start server
 async function startServer() {
   try {
-    await db.connect();
+    // Initialize DI container
+    await container.initialize();
+
+    const app = express();
+    configureExpress(app);
+
+    // Get services from container
+    const instagramService = container.get("instagramService");
+    const sessionService = container.get("sessionService");
+    const logger = container.get("logger");
+
+    // Setup routes with injected services
+    app.use(
+      "/api/v1/instagram",
+      require("./api/v1/routes/instagram.routes")(instagramService)
+    );
+    app.use(
+      "/api/v1/auth",
+      require("./api/v1/routes/auth.routes")(sessionService)
+    );
+
+    // Start server
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
-      logger.info(
-        `Server running on port ${PORT} in ${process.env.NODE_ENV} mode`
-      );
+      logger.info(`Server running on port ${PORT}`);
+    });
+
+    // Cleanup on shutdown
+    process.on("SIGINT", async () => {
+      await container.cleanup();
+      process.exit(0);
     });
   } catch (error) {
-    logger.error("Server startup failed:", error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 }
@@ -47,5 +47,3 @@ async function startServer() {
 if (require.main === module) {
   startServer();
 }
-
-module.exports = app;
