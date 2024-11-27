@@ -8,7 +8,7 @@ const logger = require("../utils/logger");
 
 const FRONTEND_URL = "http://localhost:5173";
 
-module.exports = (app) => {
+module.exports = (app, passport) => {
   // Basic middleware
   app.use(express.json());
   app.use(

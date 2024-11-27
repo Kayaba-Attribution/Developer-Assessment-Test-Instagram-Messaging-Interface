@@ -4,9 +4,10 @@ const logger = require("./utils/logger");
 const Database = require("./config/database");
 const BrowserService = require("./core/browser/browser.service");
 const ProxyService = require("./core/proxy/proxy.service");
-const SessionService = require("./core/session/session.service");
-const InstagramService = require("./core/instagram/instagram.service");
-const MailService = require("./core/mail/mail.service");
+const MailService = require("./core/mail/temp-mail.service");
+
+// const SessionService = require("./core/session/session.service");
+// const InstagramService = require("./core/instagram/instagram.service");
 
 class Container {
   constructor() {
@@ -20,7 +21,7 @@ class Container {
     this.register("logger", logger);
 
     // Database setup
-    const db = new Database();
+    const db = new Database(this.get("logger"));
     await db.connect();
     this.register("db", db);
 
@@ -30,25 +31,24 @@ class Container {
       "proxyService",
       new ProxyService(this.get("logger"), config.proxy)
     );
-
-    this.register(
-      "sessionService",
-      new SessionService(this.get("db"), this.get("logger"))
-    );
-
+    
     this.register("mailService", new MailService(this.get("logger")));
 
-    // Business logic
-    this.register(
-      "instagramService",
-      new InstagramService(
-        this.get("browserService"),
-        this.get("proxyService"),
-        this.get("sessionService"),
-        this.get("mailService"),
-        this.get("logger")
-      )
-    );
+    // this.register(
+    //   "sessionService",
+    //   new SessionService(this.get("db"), this.get("logger"))
+    // );
+    // // Business logic
+    // this.register(
+    //   "instagramService",
+    //   new InstagramService(
+    //     this.get("browserService"),
+    //     this.get("proxyService"),
+    //     this.get("sessionService"),
+    //     this.get("mailService"),
+    //     this.get("logger")
+    //   )
+    // );
   }
 
   register(name, instance) {

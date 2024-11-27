@@ -10,21 +10,27 @@ async function startServer() {
     await container.initialize();
 
     const app = express();
-    configureExpress(app);
-
+    
     // Get services from container
-    const instagramService = container.get("instagramService");
-    const sessionService = container.get("sessionService");
+    const db = container.get('db');
     const logger = container.get("logger");
+    
+    // Initialize passport with our db instance
+    const passportInstance = require('./config/passport.config')(db, logger);
+    
+    configureExpress(app, passportInstance);
+
+    // const instagramService = container.get("instagramService");
+    // const sessionService = container.get("sessionService");
 
     // Setup routes with injected services
-    app.use(
-      "/api/v1/instagram",
-      require("./api/v1/routes/instagram.routes")(instagramService)
-    );
+    // app.use(
+    //   "/api/v1/instagram",
+    //   require("./api/v1/routes/instagram.routes")(instagramService)
+    // );
     app.use(
       "/api/v1/auth",
-      require("./api/v1/routes/auth.routes")(sessionService)
+      require("./api/v1/routes/auth.routes")
     );
 
     // Start server

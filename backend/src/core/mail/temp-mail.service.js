@@ -3,13 +3,14 @@ const crypto = require("crypto");
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-const logger = require("../../utils/logger");
 
 class TempMailService {
   constructor(
+    logger,
     firstNamesFile = "first-name.txt",
     lastNamesFile = "last-name.txt"
   ) {
+    this.logger = logger;
     this.domains = [
       "@cevipsa.com",
       "@cpav3.com",
@@ -40,8 +41,8 @@ class TempMailService {
       "Brown",
     ]);
 
-    logger.info("TempMailService initialized");
-    logger.info(`Example email: ${JSON.stringify(this.generateEmail())}`);
+    this.logger.info("TempMailService initialized");
+    this.logger.info(`Example email: ${JSON.stringify(this.generateEmail())}`);
   }
 
   loadNamesFromFile(fileName, fallback) {
@@ -53,20 +54,20 @@ class TempMailService {
           .split(/\r?\n/)
           .filter((name) => name.trim() !== "");
         if (names.length > 0) {
-          logger.info(`Loaded ${names.length} names from file ${fileName}`);
+          this.logger.info(`Loaded ${names.length} names from file ${fileName}`);
           return names;
         } else {
-          logger.warn(
+          this.logger.warn(
             `File ${fileName} is empty. Falling back to default names.`
           );
         }
       } else {
-        logger.warn(
-          `File ${fileName} does not exist. Falling back to default names.`
+        this.logger.warn(
+          `[TempMailService] File ${fileName} does not exist. Falling back to default names.`
         );
       }
     } catch (error) {
-      logger.error(`Error reading file ${fileName}: ${error.message}`);
+      this.logger.error(`Error reading file ${fileName}: ${error.message}`);
     }
     return fallback;
   }
@@ -131,4 +132,4 @@ class TempMailService {
   }
 }
 
-module.exports = new TempMailService();
+module.exports = TempMailService;

@@ -1,11 +1,19 @@
 // src/config/database.js
 const { MongoClient, ServerApiVersion } = require("mongodb");
-const logger = require("../utils/logger");
-
 class Database {
-  constructor() {
+  constructor(logger) {
+    this.logger = logger;
     this.client = null;
     this.db = null;
+
+    if (!process.env.MONGODB_URI) {
+      throw new Error("MONGODB_URI is required");
+    }
+    if(!this.logger) {
+      throw new Error("Logger is required");
+    }
+
+    logger.info("Database initialized");
   }
 
   async connect() {
@@ -25,13 +33,13 @@ class Database {
 
       // Verify connection
       await this.client.db("admin").command({ ping: 1 });
-      logger.info("Successfully connected to MongoDB");
+      this.logger.info("Successfully connected to MongoDB");
 
       this.db = this.client.db(process.env.DB_NAME || "instagram_messenger");
 
       return this.db;
     } catch (error) {
-      logger.error("MongoDB connection error:", error);
+      this.logger.error("MongoDB connection error:", error);
       throw error;
     }
   }
@@ -50,4 +58,4 @@ class Database {
   }
 }
 
-module.exports = new Database();
+module.exports = Database;

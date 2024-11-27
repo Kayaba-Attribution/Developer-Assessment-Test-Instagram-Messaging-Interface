@@ -1,35 +1,155 @@
 // src/core/browser/browser.service.js
 const { chromium } = require("playwright");
 const { wrap } = require("agentql");
+const crypto = require("crypto");
+const BROWSER_CONFIG = require("./browser.config");
 
 class BrowserService {
   constructor(config, logger) {
     this.config = config;
     this.logger = logger;
+    this.browserConfig = BROWSER_CONFIG;
+  }
+
+  generateFingerprint() {
+    const location =
+      this.browserConfig.LOCATIONS[
+        Math.floor(Math.random() * this.browserConfig.LOCATIONS.length)
+      ];
+
+    return {
+      userAgent:
+        this.browserConfig.USER_AGENTS[
+          Math.floor(Math.random() * this.browserConfig.USER_AGENTS.length)
+        ],
+      language:
+        this.browserConfig.LANGUAGES[
+          Math.floor(Math.random() * this.browserConfig.LANGUAGES.length)
+        ],
+      referer:
+        this.browserConfig.REFERERS[
+          Math.floor(Math.random() * this.browserConfig.REFERERS.length)
+        ],
+      viewport: {
+        width:
+        this.browserConfig.BROWSER_WIDTH + Math.floor(Math.random() * this.browserConfig.VIEWPORT_JITTER),
+        height:
+          this.browserConfig.BROWSER_HEIGHT + Math.floor(Math.random() * this.browserConfig.VIEWPORT_JITTER),
+      },
+      ...location,
+      webGLVendor: "Google Inc. (Intel)",
+      webGLRenderer:
+        "ANGLE (Intel, Intel(R) UHD Graphics Direct3D11 vs_5_0 ps_5_0)",
+      hardwareConcurrency: 8,
+      deviceMemory: 8,
+      platform: "Win32",
+    };
   }
 
   async createPage(sessionData = null, proxy = null) {
+    const fingerprint = this.generateFingerprint();
+
     const browser = await chromium.launch({
       headless: this.config.headless,
-      args: [...this.config.browserOptions.args],
+      args: [
+        ...this.browserConfig.BROWSER_ARGS,
+        ...(proxy ? [`--proxy-server=${proxy.server}`] : []),
+      ],
+      ignoreDefaultArgs: this.browserConfig.IGNORED_ARGS,
     });
 
     const context = await browser.newContext({
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-      viewport: { width: 1280, height: 720 },
+      userAgent: fingerprint.userAgent,
+      viewport: fingerprint.viewport,
+      locale: fingerprint.language,
+      timezoneId: fingerprint.timezone,
+      geolocation: fingerprint.geolocation,
+      permissions: ["geolocation", "notifications"],
+      extraHTTPHeaders: {
+        "Accept-Language": fingerprint.language,
+        Referer: fingerprint.referer,
+        DNT: Math.random() > 0.5 ? "1" : "0",
+        "Sec-Ch-Ua": '"Chromium";v="119", "Google Chrome";v="119"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+      },
       ...(sessionData && { storageState: sessionData }),
-      ...(proxy && { proxy }),
+      ...(proxy && {
+        proxy: {
+          server: proxy.server,
+          username: proxy.username,
+          password: proxy.password,
+        },
+      }),
+    });
+
+    await context.addInitScript(() => {
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = (parameters) =>
+        parameters.name === "notifications"
+          ? Promise.resolve({ state: Notification.permission })
+          : originalQuery(parameters);
+
+      // Overwrite properties that might reveal automation
+      Object.defineProperties(navigator, {
+        webdriver: { get: () => undefined },
+        languages: { get: () => ["en-US", "en"] },
+        plugins: { get: () => [1, 2, 3, 4, 5] },
+        permissions: {
+          get: () => ({
+            query: async () => ({ state: "granted" }),
+          }),
+        },
+      });
+
+      // Add Chrome runtime
+      window.chrome = {
+        runtime: {},
+        app: {},
+        csi: () => {},
+        loadTimes: () => {},
+      };
+
+      // Mock canvas fingerprint
+      const getContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function (type) {
+        const context = getContext.apply(this, arguments);
+        if (type === "2d") {
+          context.fillText = function () {
+            arguments[0] = arguments[0].replace(/./g, args[0][0]);
+            return context.__proto__.fillText.apply(context, arguments);
+          };
+        }
+        return context;
+      };
     });
 
     const page = await wrap(await context.newPage());
-    return { browser, page };
+
+    // Add mouse movement simulation
+    await this.simulateHumanBehavior(page);
+
+    return { browser, page, fingerprint };
+  }
+
+  async simulateHumanBehavior(page) {
+    const moveCount = Math.floor(Math.random() * 3) + 2;
+    for (let i = 0; i < moveCount; i++) {
+      await page.mouse.move(Math.random() * 1920, Math.random() * 1080, {
+        steps: 10,
+      });
+      await page.waitForTimeout(Math.random() * 200 + 100);
+    }
   }
 
   async takeScreenshot(page, name) {
     if (!this.config.saveScreenshots) return null;
-    const path = `${this.config.screenshotsDir}/${name}_${Date.now()}.png`;
+    const timestamp = Date.now();
+    const randomSuffix = crypto.randomBytes(4).toString("hex");
+    const path = `${this.config.screenshotsDir}/${name}_${timestamp}_${randomSuffix}.png`;
     await page.screenshot({ path });
     return path;
   }
 }
+
+module.exports = BrowserService;
