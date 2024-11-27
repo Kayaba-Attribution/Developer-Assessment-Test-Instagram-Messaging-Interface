@@ -1,91 +1,55 @@
 // src/api/v1/controllers/instagram.controller.js
-const InstagramService = require("../../../core/instagram/instagram.service");
-const logger = require("../../../utils/logger");
-
 class InstagramController {
+  constructor({ loginService, registerService, messageService, logger }) {
+    this.loginService = loginService;
+    this.registerService = registerService;
+    this.messageService = messageService;
+    this.logger = logger;
+  }
+
   async register(req, res) {
     try {
-      const result = await InstagramService.register();
-
-      if (!result.success) {
-        return res.status(400).json(result);
-      }
-
-      res.json(result);
+      const result = await this.registerService.register();
+      res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
-      logger.error("Registration error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Internal server error",
-        details: error.message,
-      });
+      this.logger.error("Registration failed:", error);
+      res.status(500).json({ success: false, error: "Registration failed" });
     }
   }
 
   async login(req, res) {
     try {
       const { username, password } = req.body;
-      const result = await InstagramService.login(username, password);
-
-      if (!result.success) {
-        return res.status(401).json(result);
+      if (!username || !password) {
+        return res
+          .status(400)
+          .json({ success: false, error: "Missing credentials" });
       }
 
-      res.json(result);
+      const result = await this.loginService.login(username, password);
+      res.status(result.success ? 200 : 401).json(result);
     } catch (error) {
-      logger.error("Login error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Internal server error",
-      });
-    }
-  }
-
-  async forceLogin(req, res) {
-    try {
-      const { username, password } = req.body;
-      const result = await InstagramService.login(username, password, {
-        force: true,
-      });
-
-      if (!result.success) {
-        return res.status(401).json(result);
-      }
-
-      res.json(result);
-    } catch (error) {
-      logger.error("Force login error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Internal server error",
-      });
+      this.logger.error("Login failed:", error);
+      res.status(500).json({ success: false, error: "Login failed" });
     }
   }
 
   async getRegistrationStatus(req, res) {
     try {
       const { username } = req.params;
-      const status = await InstagramService.getRegistrationStatus(username);
-
+      const status = await this.registerService.getStatus(username);
       if (!status) {
-        return res.status(404).json({
-          success: false,
-          error: "Registration not found",
-        });
+        return res.status(404).json({ success: false, error: "Not found" });
       }
-
-      res.json({
-        success: true,
-        data: status,
-      });
+      res.json({ success: true, data: status });
     } catch (error) {
-      logger.error("Status check error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Internal server error",
-      });
+      this.logger.error("Status check failed:", error);
+      res.status(500).json({ success: false, error: "Status check failed" });
     }
   }
 }
 
-module.exports = new InstagramController();
+// Factory function for easy instantiation
+const createController = (services) => new InstagramController(services);
+
+module.exports = { InstagramController, createController };

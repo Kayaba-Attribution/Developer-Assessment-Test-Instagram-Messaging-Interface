@@ -1,51 +1,6 @@
 [
   {
-    "server": "http://185.206.71.91:9090",
-    "type": "http",
-    "isKnown": false
-  },
-  {
-    "server": "http://47.238.128.246:100",
-    "type": "http",
-    "isKnown": false
-  },
-  {
-    "server": "http://8.219.97.248:80",
-    "type": "http",
-    "isKnown": false
-  },
-  {
     "server": "http://204.57.112.5:80",
-    "type": "http",
-    "isKnown": false
-  },
-  {
-    "server": "http://47.119.164.33:8080",
-    "type": "http",
-    "isKnown": false
-  },
-  {
-    "server": "http://8.221.139.222:8008",
-    "type": "http",
-    "isKnown": false
-  },
-  {
-    "server": "http://44.195.247.145:80",
-    "type": "http",
-    "isKnown": false
-  },
-  {
-    "server": "http://39.102.208.23:8081",
-    "type": "http",
-    "isKnown": false
-  },
-  {
-    "server": "http://157.254.53.50:80",
-    "type": "http",
-    "isKnown": false
-  },
-  {
-    "server": "http://8.220.205.172:9098",
     "type": "http",
     "isKnown": false
   }

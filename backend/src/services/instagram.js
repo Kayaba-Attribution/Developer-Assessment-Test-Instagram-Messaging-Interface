@@ -11,20 +11,6 @@ const {
   loadSessionFromFile,
 } = require("../utils/files");
 
-async function checkForErrors(page) {
-  try {
-    const errorElements = await page.queryElements(QUERIES.ERROR_MESSAGE);
-    if (errorElements?.error_message) {
-      const errorText = await errorElements.error_message.textContent();
-      logger.error("Login error message:", errorText);
-      return errorText;
-    }
-    return null;
-  } catch (error) {
-    logger.error("Error checking for errors:", error);
-    return "Unknown error occurred";
-  }
-}
 
 
 async function instagramLogin(username, password) {
@@ -139,6 +125,22 @@ async function instagramLogin(username, password) {
     if (browser) await browser.close();
   }
 }
+
+async function checkForErrors(page) {
+  try {
+    const errorElements = await page.queryElements(QUERIES.ERROR_MESSAGE);
+    if (errorElements?.error_message) {
+      const errorText = await errorElements.error_message.textContent();
+      logger.error("Login error message:", errorText);
+      return errorText;
+    }
+    return null;
+  } catch (error) {
+    logger.error("Error checking for errors:", error);
+    return "Unknown error occurred";
+  }
+}
+
 
 async function loadSavedSession() {
   let browser;

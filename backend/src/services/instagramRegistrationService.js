@@ -7,9 +7,7 @@ const { chromium } = require("playwright");
 const freeProxyService = require("./freeProxyService");
 const proxyTester = require("./proxyTester");
 const { takeScreenshot } = require("../utils/files");
-const { log } = require("console");
-const { init, move } = require("../server");
-const { QUERIES } = require("../config/constants");
+
 
 class InstagramRegistrationService {
   constructor() {

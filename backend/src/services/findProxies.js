@@ -69,7 +69,7 @@ async function findAndSaveWorkingProxies(
 }
 
 
-const numberOfProxiesToFind = 10;
+const numberOfProxiesToFind = 3;
 
 findAndSaveWorkingProxies(numberOfProxiesToFind)
   .then((proxies) => {

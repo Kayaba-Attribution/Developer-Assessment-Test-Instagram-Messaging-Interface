@@ -4,52 +4,78 @@ const express = require("express");
 const container = require("./container");
 const configureExpress = require("./config/express.config");
 
+/**
+ * Server initialization and route setup
+ *
+ * Flow:
+ * 1. Initialize container (services, db, etc)
+ * 2. Setup Express with middleware
+ * 3. Initialize authentication
+ * 4. Mount routes
+ * 5. Start server
+ */
 async function startServer() {
   try {
-    // Initialize DI container
+    // 1. Core initialization
     await container.initialize();
-
     const app = express();
-    
-    // Get services from container
-    const db = container.get('db');
     const logger = container.get("logger");
-    
-    // Initialize passport with our db instance
-    const passportInstance = require('./config/passport.config')(db, logger);
-    
+
+    // 2. Express and auth setup
+    const passportInstance = require("./config/passport.config")(
+      container.get("db"),
+      logger
+    );
     configureExpress(app, passportInstance);
 
-    // const instagramService = container.get("instagramService");
-    // const sessionService = container.get("sessionService");
+    // 3. Route mounting
+    mountRoutes(app);
 
-    // Setup routes with injected services
-    // app.use(
-    //   "/api/v1/instagram",
-    //   require("./api/v1/routes/instagram.routes")(instagramService)
-    // );
-    app.use(
-      "/api/v1/auth",
-      require("./api/v1/routes/auth.routes")
-    );
-
-    // Start server
+    // 4. Start server
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });
 
-    // Cleanup on shutdown
-    process.on("SIGINT", async () => {
-      await container.cleanup();
-      process.exit(0);
-    });
+    setupGracefulShutdown();
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
   }
 }
 
+/**
+ * Centralized route mounting
+ * Keeps routes organized and prevents duplication
+ */
+function mountRoutes(app) {
+  // Auth routes
+  app.use('/api/v1/auth', require('./api/v1/routes/auth.routes'));
+
+  // Instagram routes
+  app.use('/api/v1/instagram', require('./api/v1/routes/instagram.routes')({
+    instagramController: container.get('instagramController')
+  }));
+}
+
+/**
+ * Cleanup handlers for graceful shutdown
+ */
+function setupGracefulShutdown() {
+  process.on("SIGINT", async () => {
+    await container.cleanup();
+    process.exit(0);
+  });
+
+  process.on("SIGTERM", async () => {
+    await container.cleanup();
+    process.exit(0);
+  });
+}
+
+// Only start server if this file is run directly
 if (require.main === module) {
   startServer();
 }
+
+module.exports = startServer; // Export for testing

@@ -1,76 +1,25 @@
-// src/core/instagram/register.service.js
-
-// Require the necessary modules
-const tempMailService = require("../mail/temp-mail.service");
-const logger = require("../../utils/logger");
-
-const { config } = require("../config");
-const proxyTester = require("./proxyTester");
-const freeProxyService = require("./freeProxyService");
-const { takeScreenshot } = require("../utils/files");
-
-
-// Built-in modules and third-party libraries
+// src/services/register.service.js
 const crypto = require("crypto");
-const { wrap } = require("agentql");
-const { chromium } = require("playwright");
+const { takeScreenshot } = require("../../utils/files");
 
-class InstagramRegistrationService {
-  constructor() {
+class RegisterService {
+  constructor(
+    browserService,
+    proxyService,
+    sessionService,
+    emailService,
+    logger,
+    config
+  ) {
+    this.browserService = browserService;
+    this.proxyService = proxyService;
+    this.sessionService = sessionService;
+    this.emailService = emailService;
+    this.logger = logger;
+    this.config = config;
+
     this.registrationAttempts = new Map();
-    this.maxRetries = 1;
-    this.browserConfig = this.initBrowserConfig();
-    this.formRegistrationSelectors = this.initFormSelectors();
-    this.signUpSelector = 'a[href="/accounts/emailsignup/"]';
-    logger.info("Instagram Registration Service initialized");
-  }
-
-  // Browser Configuration
-  initBrowserConfig() {
-    return {
-      contextOptions: {
-        userAgent: this.getRandomUserAgent(),
-        viewport: { width: 1280, height: 720 },
-        deviceScaleFactor: 1,
-        hasTouch: false,
-        isMobile: false,
-        locale: "en-US",
-        timezoneId: "America/New_York",
-        permissions: ["geolocation"],
-      },
-      stealthScript: () => {
-        Object.defineProperty(navigator, "webdriver", { get: () => false });
-        Object.defineProperty(navigator, "plugins", {
-          get: () => [1, 2, 3, 4, 5],
-        });
-
-        // Add Chrome runtime
-        window.chrome = {
-          runtime: {},
-          loadTimes: () => {},
-          csi: () => {},
-          app: {},
-        };
-
-        // Override permissions
-        const originalQuery = window.navigator.permissions.query;
-        window.navigator.permissions.query = async (parameters) => {
-          if (parameters.name === "notifications") {
-            return { state: Notification.permission };
-          }
-          return originalQuery(parameters);
-        };
-
-        // Add custom navigator properties
-        Object.defineProperty(navigator, "platform", { get: () => "Win32" });
-        Object.defineProperty(navigator, "language", { get: () => "en-US" });
-      },
-    };
-  }
-
-  // Form Selectors
-  initFormSelectors() {
-    return {
+    this.formSelectors = {
       email: 'input[name="emailOrPhone"]',
       fullName: 'input[name="fullName"]',
       username: 'input[name="username"]',
@@ -80,101 +29,26 @@ class InstagramRegistrationService {
       birthdayDay: 'select[title="Day:"]',
       birthdayYear: 'select[title="Year:"]',
       next: 'button[type="button"]:has-text("Next")',
+      signUpLink: 'a[href="/accounts/emailsignup/"]',
+      verificationCode: 'input[name="email_confirmation_code"]',
+      nextButton: 'div[role="button"]:has-text("Next")',
     };
   }
 
-  // Main Registration Flow
   async register() {
-    let attempt = 0;
-    let lastError = null;
+    let browser, page, proxy;
 
-    while (attempt < this.maxRetries) {
-      let browser;
-      let proxy;
-
-      try {
-        attempt++;
-        logger.info(`Registration attempt ${attempt} of ${this.maxRetries}`);
-
-        proxy = await this.getVerifiedProxy();
-        const registrationData = this.prepareRegistrationData();
-        browser = await chromium.launch({
-          headless: config.headless,
-          args: config.browserOptions.args,
-        });
-        const page = await this.setupPage(browser);
-
-        const result = await this.performRegistration(page, registrationData);
-
-        await browser.close();
-
-        if (result.success) {
-          return result;
-        }
-
-        lastError = new Error(result.error);
-      } catch (error) {
-        logger.error("Registration error:", error);
-        lastError = error;
-      }
-      if (attempt === this.maxRetries) {
-        return {
-          success: false,
-          error: lastError.message,
-        };
-      }
-    }
-  }
-
-  // Proxy Handling
-  async getVerifiedProxy() {
-    while (true) {
-      const proxy = await freeProxyService.getProxy();
-      logger.info(`Testing proxy: ${proxy.server}`);
-
-      const isValid = await proxyTester.testProxy(proxy);
-      if (isValid) {
-        logger.info(`Found working proxy: ${proxy.server}`);
-        return proxy;
-      }
-
-      logger.warn(`Proxy ${proxy.server} failed testing, trying another...`);
-    }
-  }
-
-  // Browser Setup
-  async initBrowser() {
-    const browser = await chromium.launch({
-      headless: config.headless,
-      args: config.browserOptions.args,
-    });
-
-    return browser;
-  }
-
-  async setupPage(browser) {
-    const context = await browser.newContext(this.browserConfig.contextOptions);
-    await context.addInitScript(this.browserConfig.stealthScript);
-
-    const page = await wrap(await context.newPage());
-
-    // Random mouse movements and delays
-    await this.simulateHumanBehavior(page);
-    logger.info("Browser and context initialized");
-
-    return page;
-  }
-
-  // Registration Process
-  async performRegistration(page, registrationData) {
     try {
-      await this.navigateToSignup(page);
-
-      await this.fillRegistrationForm(
-        page,
-        this.formRegistrationSelectors,
-        registrationData
+      proxy = await this.proxyService.getWorkingProxy();
+      const registrationData = this._prepareRegistrationData();
+      // ! PROXY IS NOT USED HERE
+      const { browser, page } = await this.browserService.createPage(
+        null,
+        null
       );
+
+      await this._navigateToSignup(page);
+      await this._fillRegistrationForm(page, registrationData);
 
       registrationData.status = "FORM_FILLED";
       this.registrationAttempts.set(
@@ -182,51 +56,61 @@ class InstagramRegistrationService {
         registrationData
       );
 
-      logger.info("Registration form filled, waiting for verification code");
+      this.logger.debug(
+        "Registration form filled, waiting for verification code"
+      );
+
       await page.waitForTimeout(6000);
-      const verificationCode = await this.getVerificationCode(
+
+      const verificationCode = await this._getVerificationCode(
         registrationData.emailHash
       );
 
       if (!verificationCode) {
-        logger.error("Verification code not found");
+        throw new Error("Verification code not found");
       }
 
-      logger.info(`Verification code received: ${verificationCode}`);
+      this.logger.debug(`Verification code received: ${verificationCode}`);
 
-      await page.waitForTimeout(200000);
-
-      await this.enterVerificationCode(page, verificationCode);
+      await this._enterVerificationCode(page, verificationCode);
 
       await page.waitForTimeout(50000);
-      return {
-        success: true,
-        data: registrationData,
-      };
+      
+      const sessionState = await browser.contexts()[0].storageState();
+      const session = await this.sessionService.createInstagramSession({
+        username: registrationData.username,
+        sessionData: sessionState,
+        proxy: proxy?.server,
+      });
+
+      return { success: true, data: { ...registrationData, session } };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      this.logger.error("Registration failed:", error);
+      return { success: false, error: error.message };
+    } finally {
+      if (browser) await browser.close();
     }
   }
 
-  async navigateToSignup(page) {
-    logger.info("Navigating to Instagram signup page");
+  async _navigateToSignup(page) {
+    this.logger.debug("Navigating to Instagram signup page");
     await page.goto("https://www.instagram.com/", {
       waitUntil: "networkidle",
       timeout: 30000,
     });
     await takeScreenshot(page, `nav_to_instagram`);
-    await page.waitForTimeout(1000);
-    logger.info("Navigated to Instagram homepage, navigating to signup page");
+    this.logger.info(
+      "Navigated to Instagram homepage, navigating to signup page"
+    );
 
     try {
       // Wait for selector with timeout
-      await page.waitForSelector(this.signUpSelector, { timeout: 5000 });
+      await page.waitForSelector(this.formSelectors.signUpLink, {
+        timeout: 5000,
+      });
 
       // Ensure element is visible and clickable
-      const signUpLink = await page.$(this.signUpSelector);
+      const signUpLink = await page.$(this.formSelectors.signUpLink);
       if (!signUpLink) {
         logger.error("Signup button not found");
       }
@@ -253,230 +137,121 @@ class InstagramRegistrationService {
 
       return true;
     } catch (error) {
-      logger.error("Form submission failed:", error.message);
+      this.logger.error("Form submission failed:", error.message);
       await takeScreenshot(page, "registration_nav_error");
       throw error;
     }
   }
 
-  // Form Handling
-  async fillRegistrationForm(page, query, data) {
-    logger.info(`Filling form with data: ${JSON.stringify(data, null, 2)}`);
-
-    await this.fillBasicInfo(page, query, data);
-    await this.setBirthday(page, query, data.birthday);
-    await this.submitAgeForm(page, query);
-  }
-
-  async fillBasicInfo(page, query, data) {
+  async _fillRegistrationForm(page, data) {
+    this.logger.debug(
+      `Filling form with data: ${JSON.stringify(data, null, 2)}`
+    );
     const fields = [
-      { selector: query.email, value: data.email },
-      { selector: query.fullName, value: data.fullName },
-      { selector: query.username, value: data.username },
-      { selector: query.password, value: data.password },
+      { selector: this.formSelectors.email, value: data.email },
+      { selector: this.formSelectors.fullName, value: data.fullName },
+      { selector: this.formSelectors.username, value: data.username },
+      { selector: this.formSelectors.password, value: data.password },
     ];
 
     for (const field of fields) {
       await page.waitForSelector(field.selector);
       await page.fill(field.selector, field.value);
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(Math.random() * 200 + 300);
     }
 
     // Take screenshot before submission
     await takeScreenshot(page, "registration_form_filled");
 
-    // Click signup button
-    await page.waitForSelector(query.signupButton);
-    await page.click(query.signupButton);
+    await page.click(this.formSelectors.signupButton);
+    this.logger.debug("Init Form submitted, waiting for next step");
+    await this._setBirthday(page, data.birthday);
+  }
 
-    // Wait for 3 seconds after submission
+  async _setBirthday(page, birthday) {
+    await page.selectOption(
+      this.formSelectors.birthdayMonth,
+      birthday.month.toString()
+    );
+    await page.waitForTimeout(Math.random() * 100 + 100);
+    await page.selectOption(
+      this.formSelectors.birthdayDay,
+      birthday.day.toString()
+    );
+    await page.waitForTimeout(Math.random() * 100 + 100);
+    await page.selectOption(
+      this.formSelectors.birthdayYear,
+      birthday.year.toString()
+    );
+    await page.waitForTimeout(Math.random() * 100 + 100);
+    await takeScreenshot(page, "birthday_set");
+    this.logger.debug("Birthday set, clicking next");
+    await page.click(this.formSelectors.next);
+  }
+
+  async _enterVerificationCode(page, code) {
+    await page.waitForSelector(this.formSelectors.verificationCode);
+    await page.fill(this.formSelectors.verificationCode, code);
+    await page.click(this.formSelectors.nextButton);
     await page.waitForTimeout(3000);
-
-    // Take screenshot after submission
-    await takeScreenshot(page, "registration_submitted");
-
-    logger.info("Form filled and submitted");
   }
 
-  async enterVerificationCode(page, code) {
-    try {
-      logger.info("Entering verification code");
+  async _getVerificationCode(emailHash) {
+    const maxAttempts = 5;
+    let attempt = 0;
 
-      // Updated selector for confirmation code input
-      const codeInputSelector = 'input[name="email_confirmation_code"]';
-      await page.waitForSelector(codeInputSelector, { timeout: 20000 });
-
-      // Clear any existing value first
-      await page.fill(codeInputSelector, "");
-
-      // Type code with small delays between characters
-      for (const digit of code.toString()) {
-        await page.type(codeInputSelector, digit);
-        await page.waitForTimeout(100);
-      }
-
-      // Take screenshot before clicking next
-      await takeScreenshot(page, "verification_code_entered");
-
-      // Updated selector for the Next button
-      const nextButtonSelector = 'div[role="button"]:has-text("Next")';
-      await page.waitForSelector(nextButtonSelector);
-      await page.click(nextButtonSelector);
-
-      // Wait for submission and potential navigation
-      await Promise.race([
-        page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-        page.waitForTimeout(20000),
-      ]);
-
-      await page.waitForTimeout(3000);
-
-      await takeScreenshot(page, "verification_code_submitted");
-      logger.info("Verification code submitted successfully");
-
-      await page.waitForTimeout(40000);
-    } catch (error) {
-      logger.error("Error entering verification code:", error);
-      await takeScreenshot(page, "verification_code_error");
-      throw error;
-    }
-  }
-  getRandomUserAgent() {
-    const userAgents = [
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0",
-    ];
-    return userAgents[Math.floor(Math.random() * userAgents.length)];
-  }
-
-  async simulateHumanBehavior(page) {
-    await page.mouse.move(Math.random() * 1920, Math.random() * 1080, {
-      steps: 10,
-    });
-    await page.waitForTimeout(Math.random() * 1000 + 500);
-  }
-
-  async setBirthday(page, query, birthday) {
-    await page.selectOption(query.birthdayMonth, birthday.month.toString());
-    await page.waitForTimeout(100);
-    await page.selectOption(query.birthdayDay, birthday.day.toString());
-    await page.waitForTimeout(100);
-    await page.selectOption(query.birthdayYear, birthday.year.toString());
-    await page.waitForTimeout(1000);
-  }
-
-  async submitAgeForm(page, query) {
-    try {
-      await page.waitForTimeout(1000);
-      // Wait for selector with timeout
-      await page.waitForSelector(query.next, { timeout: 5000 });
-
-      // Ensure element is visible and clickable
-      const nextBtn = await page.$(query.next);
-      if (!nextBtn) {
-        logger.error("Next button not found");
-      }
-
-      // Check if button is visible and enabled
-      const isVisible = await nextBtn.isVisible();
-      const isEnabled = await nextBtn.isEnabled();
-
-      if (!isVisible || !isEnabled) {
-        logger.error("Next button is not clickable");
-      }
-
-      // Click the button
-      await nextBtn.click();
-
-      // Wait for navigation or next state
-      await Promise.race([
-        page
-          .waitForNavigation({ waitUntil: "networkidle0", timeout: 5000 })
-          .catch(() => {}),
-        page.waitForTimeout(2000),
-      ]);
-
-      // Take screenshot
-      await takeScreenshot(page, "next_form_submission_submitted");
-
-      return true;
-    } catch (error) {
-      logger.error("Form submission failed:", error.message);
-      await takeScreenshot(page, "next_form_submission_error");
-      throw error;
-    }
-  }
-
-  async getVerificationCode(emailHash) {
-    try {
-      const emails = await tempMailService.getEmails(emailHash);
-
-      const sortedEmails = emails.sort(
-        (a, b) => b.mail_timestamp - a.mail_timestamp
-      );
-
-      // logger.debug("Emails received:", sortedEmails);
-
-      for (const email of sortedEmails) {
-        const code = tempMailService.extractVerificationCode(
-          email.mail_subject
+    while (attempt < maxAttempts) {
+      try {
+        const code = await this.emailService.getVerificationCode(emailHash);
+        if (code) return code;
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        attempt++;
+      } catch (error) {
+        this.logger.warn(
+          `Attempt ${attempt + 1} failed to get verification code:`,
+          error
         );
-        if (code) {
-          return code;
-        }
+        attempt++;
       }
-    } catch (error) {
-      logger.error("Error getting verification code:", error.message);
-      throw error;
     }
+    return null;
   }
 
-  // Data Generation
-  prepareRegistrationData() {
-    const emailData = tempMailService.generateEmail();
+  _prepareRegistrationData() {
+    const emailData = this.emailService.generateEmail();
     const emailPrefix = emailData.email.split("@")[0];
 
     return {
       email: emailData.email,
       emailHash: emailData.hash,
       username: `${emailPrefix}_${Date.now().toString().slice(-4)}`,
-      fullName: this.generateFullName(),
-      password: this.generateSecurePassword(),
-      birthday: this.generateBirthday(),
+      fullName: this._generateFullName(),
+      password: this._generateSecurePassword(),
+      birthday: this._generateBirthday(),
       status: "INITIALIZED",
       timestamp: Date.now(),
     };
   }
 
-  generateFullName() {
-    const firstName =
-      tempMailService.firstNames[
-        Math.floor(Math.random() * tempMailService.firstNames.length)
-      ];
-    const lastName =
-      tempMailService.lastNames[
-        Math.floor(Math.random() * tempMailService.lastNames.length)
-      ];
-    return `${firstName} ${lastName}`;
-  }
-
-  generateSecurePassword() {
+  _generateSecurePassword() {
     return `${crypto.randomBytes(8).toString("hex")}!1A`;
   }
 
-  generateBirthday() {
-    const year = 1990 + Math.floor(Math.random() * 15);
-    const month = 1 + Math.floor(Math.random() * 12);
-    const day = 1 + Math.floor(Math.random() * 28);
-    return { year, month, day };
+  _generateBirthday() {
+    return {
+      year: 1990 + Math.floor(Math.random() * 15),
+      month: 1 + Math.floor(Math.random() * 12),
+      day: 1 + Math.floor(Math.random() * 28),
+    };
   }
 
-  // Status Management
+  _generateFullName() {
+    return this.emailService.generateFullName();
+  }
+
   getRegistrationStatus(username) {
     return this.registrationAttempts.get(username);
   }
 }
 
-module.exports = new InstagramRegistrationService();
+module.exports = RegisterService;

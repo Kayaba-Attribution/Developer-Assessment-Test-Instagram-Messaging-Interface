@@ -1,4 +1,3 @@
-
 const crypto = require("crypto");
 const axios = require("axios");
 const fs = require("fs");
@@ -42,7 +41,9 @@ class TempMailService {
     ]);
 
     this.logger.info("TempMailService initialized");
-    this.logger.info(`Example email: ${JSON.stringify(this.generateEmail())}`);
+    this.logger.debug(
+      `Example email: ${JSON.stringify(this.generateEmail(), null, 2)}`
+    );
   }
 
   loadNamesFromFile(fileName, fallback) {
@@ -54,7 +55,9 @@ class TempMailService {
           .split(/\r?\n/)
           .filter((name) => name.trim() !== "");
         if (names.length > 0) {
-          this.logger.info(`Loaded ${names.length} names from file ${fileName}`);
+          this.logger.debug(
+            `Loaded ${names.length} names from file ${fileName}`
+          );
           return names;
         } else {
           this.logger.warn(
@@ -129,6 +132,40 @@ class TempMailService {
       }
     }
     return null;
+  }
+
+  async getVerificationCode(emailHash) {
+    try {
+      const emails = await this.getEmails(emailHash);
+
+      const sortedEmails = emails.sort(
+        (a, b) => b.mail_timestamp - a.mail_timestamp
+      );
+
+      for (const email of sortedEmails) {
+        const code = this.extractVerificationCode(
+          email.mail_subject
+        );
+        if (code) {
+          return code;
+        }
+      }
+    } catch (error) {
+      this.logger.error("Error getting verification code:", error.message);
+      throw error;
+    }
+  }
+
+  generateFullName() {
+    const firstName =
+      this.firstNames[
+        Math.floor(Math.random() * this.firstNames.length)
+      ];
+    const lastName =
+      this.lastNames[
+        Math.floor(Math.random() * this.lastNames.length)
+      ];
+    return `${firstName} ${lastName}`;
   }
 }
 

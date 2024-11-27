@@ -2,12 +2,16 @@
 const { chromium } = require("playwright");
 const { wrap } = require("agentql");
 const crypto = require("crypto");
-const BROWSER_CONFIG = require("./browser.config");
+const { BROWSER_CONFIG } = require("./browser.config");
 
 class BrowserService {
   constructor(config, logger) {
     this.config = config;
     this.logger = logger;
+    this.logger.info(
+      "Browser service initialized",
+      BROWSER_CONFIG.IGNORED_ARGS
+    );
     this.browserConfig = BROWSER_CONFIG;
   }
 
@@ -32,9 +36,11 @@ class BrowserService {
         ],
       viewport: {
         width:
-        this.browserConfig.BROWSER_WIDTH + Math.floor(Math.random() * this.browserConfig.VIEWPORT_JITTER),
+          this.browserConfig.BROWSER_WIDTH +
+          Math.floor(Math.random() * this.browserConfig.VIEWPORT_JITTER),
         height:
-          this.browserConfig.BROWSER_HEIGHT + Math.floor(Math.random() * this.browserConfig.VIEWPORT_JITTER),
+          this.browserConfig.BROWSER_HEIGHT +
+          Math.floor(Math.random() * this.browserConfig.VIEWPORT_JITTER),
       },
       ...location,
       webGLVendor: "Google Inc. (Intel)",
@@ -49,11 +55,25 @@ class BrowserService {
   async createPage(sessionData = null, proxy = null) {
     const fingerprint = this.generateFingerprint();
 
+    let proxyServer = `http://104.207.35.73:3128`;
+    this.logger.info(`[BrowserService] Configured proxy: ${proxyServer}`);
+    // this.logger.info("[BrowserService] Using proxy:", proxy);
+    // if (proxy?.server) {
+    //   try {
+    //     const [, host, port] = proxy.server.match(/http:\/\/([^:]+):(\d+)/);
+    //     proxyServer = `http://${host}:${port}`;
+    //     this.logger.info(`[BrowserService] Configured proxy: ${proxyServer}`);
+    //   } catch (error) {
+    //     this.logger.error(`[BrowserService] Invalid proxy format: ${proxy.server}`);
+    //     throw new Error('Invalid proxy format');
+    //   }
+    // }
+
     const browser = await chromium.launch({
       headless: this.config.headless,
       args: [
         ...this.browserConfig.BROWSER_ARGS,
-        ...(proxy ? [`--proxy-server=${proxy.server}`] : []),
+        ...(proxyServer ? [`--proxy-server=${proxyServer}`] : []),
       ],
       ignoreDefaultArgs: this.browserConfig.IGNORED_ARGS,
     });
@@ -74,13 +94,7 @@ class BrowserService {
         "Sec-Ch-Ua-Platform": '"Windows"',
       },
       ...(sessionData && { storageState: sessionData }),
-      ...(proxy && {
-        proxy: {
-          server: proxy.server,
-          username: proxy.username,
-          password: proxy.password,
-        },
-      }),
+      ...(proxyServer && { proxy: { server: proxyServer } }),
     });
 
     await context.addInitScript(() => {
