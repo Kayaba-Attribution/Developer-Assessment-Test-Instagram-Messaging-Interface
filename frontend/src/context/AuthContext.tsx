@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/auth/user', {
+      const response = await fetch('http://localhost:3000/api/v1/auth/user', {
         credentials: 'include',  // Important!
         headers: {
           'Accept': 'application/json'
@@ -60,11 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
   
   const loginWithGoogle = () => {
-    window.location.href = 'http://localhost:3000/api/auth/google';
+    console.log('loginWithGoogle');
+    window.location.href = 'http://localhost:3000/api/v1/auth/google';
   };
 
   const logout = async () => {
-    await fetch('http://localhost:3000/api/auth/logout', {
+    await fetch('http://localhost:3000/api/v1/auth/logout', {
       credentials: 'include'
     });
     setState({ user: null, isLoading: false });
