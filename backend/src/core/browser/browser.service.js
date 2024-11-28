@@ -55,11 +55,7 @@ class BrowserService {
   async createPage(sessionData = null, proxy = null) {
     const fingerprint = this.generateFingerprint();
 
-    const proxyConfig = {
-      server: "http://pr.oxylabs.io:7777",
-      username: "customer-posty_oQQDk",
-      password: "bv6sfaQedBJtdbt4D6Uc+",
-    };
+    const proxyConfig = this.config.OXYLABS_PROXY;
 
     this.logger.info("[BrowserService] Attempting to use proxy:", {
       server: proxyConfig.server,
@@ -153,6 +149,48 @@ class BrowserService {
     await this.simulateHumanBehavior(page);
 
     return { browser, page, fingerprint };
+  }
+
+  async createPageAdsPower(sessionData = null, proxy = null) {
+    const fingerprint = this.generateFingerprint();
+    const userId = this.config.ADS_POWER_USER;
+    const adsPowerUrl = `http://local.adspower.net:50325/api/v1/browser/start?user_id=${userId}&open_tabs=1&delete_user_data=false`;
+
+    try {
+      this.logger.info('[BrowserService] Attempting to connect to AdsPower:', adsPowerUrl);
+      
+      const adsPowerResponse = await fetch(adsPowerUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!adsPowerResponse.ok) {
+        throw new Error(`AdsPower API returned status ${adsPowerResponse.status}: ${await adsPowerResponse.text()}`);
+      }
+
+      const responseData = await adsPowerResponse.json();
+      if (responseData.code !== 0) {
+        this.logger.error('[BrowserService] Failed to start AdsPower browser:', responseData.msg);
+        throw new Error(`AdsPower failed to start: ${responseData.msg}`);
+      }
+
+      // Use the puppeteer websocket URL directly
+      const wsEndpoint = responseData.data.ws.puppeteer;
+      this.logger.info('[BrowserService] Connecting to websocket:', wsEndpoint);
+
+      const browser = await chromium.connectOverCDP(wsEndpoint);
+      const context = browser.contexts()[0];
+      const page = await wrap(await context.newPage());
+
+      await this.simulateHumanBehavior(page);
+
+      return { browser, page, fingerprint };
+    } catch (error) {
+      this.logger.error('[BrowserService] AdsPower connection failed:', error);
+      throw new Error(`Failed to connect to AdsPower: ${error.message}`);
+    }
   }
 
   async simulateHumanBehavior(page) {

@@ -14,6 +14,7 @@ const RegisterService = require("./core/instagram/register.service");
 const {
   InstagramController,
 } = require("./api/v1/controllers/instagram.controller");
+const MessageService = require("./core/instagram/message.service");
 
 
 class Container {
@@ -86,10 +87,21 @@ class Container {
     this.register("loginService", loginService);
     this.register("registerService", registerService);
 
+    // Add MessageService
+    const messageService = new MessageService(
+      browserService,
+      proxyService,
+      sessionService,
+      logger,
+      config
+    );
+
+    this.register("messageService", messageService);
+
     const instagramController = new InstagramController({
       loginService,
       registerService,
-      null: null, // message
+      messageService,
       logger,
     });
 

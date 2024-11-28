@@ -6,6 +6,13 @@ const isDev = NODE_ENV === "development";
 
 const config = {
   development: {
+    FAST_MODE: false,
+    ADS_POWER_USER: 'kqh9k11',
+    OXYLABS_PROXY: {
+      server: "http://pr.oxylabs.io:7777",
+      username: "customer-posty_oQQDk",
+      password: "bv6sfaQedBJtdbt4D6Uc+",
+    },
     logLevel: "debug",
     headless: false,
     saveScreenshots: true,

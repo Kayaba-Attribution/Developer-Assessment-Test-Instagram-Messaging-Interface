@@ -33,6 +33,9 @@ class RegisterService {
       verificationCode: 'input[name="email_confirmation_code"]',
       nextButton: 'div[role="button"]:has-text("Next")',
     };
+
+    this.DIRECT_SIGNUP_URL = "https://www.instagram.com/accounts/emailsignup/";
+    this.fastMode = config.FAST_MODE || false;
   }
 
   async register() {
@@ -41,13 +44,15 @@ class RegisterService {
     try {
       proxy = await this.proxyService.getWorkingProxy();
       const registrationData = this._prepareRegistrationData();
-      // ! PROXY IS NOT USED HERE
+
       const { browser, page } = await this.browserService.createPage(
         null,
         null
       );
 
       await this._navigateToSignup(page);
+
+      await page.waitForTimeout(10000);
       await this._fillRegistrationForm(page, registrationData);
 
       registrationData.status = "FORM_FILLED";
@@ -93,17 +98,79 @@ class RegisterService {
   }
 
   async _navigateToSignup(page) {
-    this.logger.debug("Navigating to Instagram signup page");
-    await page.goto("https://www.instagram.com/", {
-      waitUntil: "networkidle",
-      timeout: 30000,
-    });
-    await takeScreenshot(page, `nav_to_instagram`);
-    this.logger.info(
-      "Navigated to Instagram homepage, navigating to signup page"
-    );
-
+    this.logger.debug("Attempting direct navigation to Instagram signup page");
+    
     try {
+      // Try direct navigation first
+      const success = await this._directNavigateToSignup(page);
+      if (success) {
+        return true;
+      }
+
+      // If direct navigation fails, fall back to old method
+      this.logger.info("Direct navigation failed, trying fallback method");
+      return await this._fallbackNavigateToSignup(page);
+    } catch (error) {
+      this.logger.error("All navigation attempts failed:", error.message);
+      await takeScreenshot(page, "navigation_all_methods_failed");
+      throw error;
+    }
+  }
+
+  async _directNavigateToSignup(page) {
+    try {
+      // Navigate directly to signup page
+      await page.goto(this.DIRECT_SIGNUP_URL, {
+        waitUntil: "networkidle",
+        timeout: 30000,
+      });
+      
+      await takeScreenshot(page, "direct_nav_to_signup");
+
+      // Verify we're on the right page
+      const currentUrl = page.url();
+      const isSignupPage = currentUrl.includes("/accounts/emailsignup/");
+      
+      if (!isSignupPage) {
+        this.logger.warn("Direct navigation: Not on signup page");
+        return false;
+      }
+
+      // Verify the form is present
+      const formVisible = await page
+        .waitForSelector(this.formSelectors.email, {
+          state: "visible",
+          timeout: 5000,
+        })
+        .then(() => true)
+        .catch(() => false);
+
+      if (!formVisible) {
+        this.logger.warn("Direct navigation: Form not visible");
+        return false;
+      }
+
+      this.logger.info("Direct navigation to signup page successful");
+      return true;
+    } catch (error) {
+      this.logger.warn("Direct navigation failed:", error.message);
+      await takeScreenshot(page, "direct_nav_failed");
+      return false;
+    }
+  }
+
+  async _fallbackNavigateToSignup(page) {
+    this.logger.debug("Using fallback navigation method");
+    
+    try {
+      await page.goto("https://www.instagram.com/", {
+        waitUntil: "networkidle",
+        timeout: 30000,
+      });
+      await takeScreenshot(page, "nav_to_instagram");
+      
+      this.logger.info("Navigated to Instagram homepage, looking for signup link");
+
       // Wait for selector with timeout
       await page.waitForSelector(this.formSelectors.signUpLink, {
         timeout: 5000,
@@ -112,7 +179,7 @@ class RegisterService {
       // Ensure element is visible and clickable
       const signUpLink = await page.$(this.formSelectors.signUpLink);
       if (!signUpLink) {
-        logger.error("Signup button not found");
+        throw new Error("Signup button not found");
       }
 
       // Check visibility
@@ -123,13 +190,15 @@ class RegisterService {
 
       // Click the button
       await signUpLink.click();
-      page.waitForTimeout(500);
+      await page.waitForTimeout(500);
 
       // Wait for navigation or next state
       await Promise.race([
         page
           .waitForNavigation({ waitUntil: "networkidle0", timeout: 5000 })
-          .catch(() => {}),
+          .catch((error) => {
+            this.logger.warn('Navigation timeout or error:', error.message);
+          }),
         page.waitForTimeout(2000),
       ]);
 
@@ -138,19 +207,20 @@ class RegisterService {
         throw new Error("Failed to navigate to registration page");
       }
 
-      // Take screenshot
-      await takeScreenshot(page, "navigated_to_registration");
-
+      await takeScreenshot(page, "fallback_nav_success");
+      this.logger.info("Fallback navigation successful");
+      
       return true;
     } catch (error) {
-      this.logger.error("Form submission failed:", error.message);
-      await takeScreenshot(page, "registration_nav_error");
+      this.logger.error("Fallback navigation failed:", error.message);
+      await takeScreenshot(page, "fallback_nav_error");
       throw error;
     }
   }
 
   async _fillRegistrationForm(page, data) {
-    this.logger.debug(`Starting form fill with human-like behavior`);
+    this.logger.debug(`Starting form fill with ${this.fastMode ? 'fast' : 'human-like'} behavior`);
+    await page.waitForTimeout(10000);
 
     const fields = [
       { selector: this.formSelectors.email, value: data.email },
@@ -165,19 +235,22 @@ class RegisterService {
         timeout: 10000,
       });
 
-      // Click the field first
       await page.click(field.selector);
       await this._randomDelay(300, 800);
 
-      // Type character by character with random delays
-      for (const char of field.value) {
-        await page.type(field.selector, char, {
-          delay: Math.random() * 200 + 100,
-        });
-        await this._randomDelay(50, 150);
+      if (this.fastMode) {
+        // Fast mode: type all at once
+        await page.type(field.selector, field.value);
+      } else {
+        // Normal mode: type character by character
+        for (const char of field.value) {
+          await page.type(field.selector, char, {
+            delay: Math.random() * 200 + 100,
+          });
+          await this._randomDelay(50, 150);
+        }
       }
 
-      // Random pause between fields
       await this._randomDelay(500, 1500);
     }
 
@@ -230,24 +303,18 @@ class RegisterService {
         }),
       ]);
 
-      // Add random delays between selections
       await this._randomDelay(500, 1000);
-      await page.selectOption(
-        this.formSelectors.birthdayMonth,
-        birthday.month.toString()
-      );
+      await page.selectOption(this.formSelectors.birthdayMonth, birthday.month.toString());
 
-      await this._randomDelay(300, 800);
-      await page.selectOption(
-        this.formSelectors.birthdayDay,
-        birthday.day.toString()
-      );
+      if (!this.fastMode) {
+        await this._randomDelay(300, 800);
+      }
+      await page.selectOption(this.formSelectors.birthdayDay, birthday.day.toString());
 
-      await this._randomDelay(300, 800);
-      await page.selectOption(
-        this.formSelectors.birthdayYear,
-        birthday.year.toString()
-      );
+      if (!this.fastMode) {
+        await this._randomDelay(300, 800);
+      }
+      await page.selectOption(this.formSelectors.birthdayYear, birthday.year.toString());
 
       await takeScreenshot(page, "birthday_set");
 
@@ -266,18 +333,38 @@ class RegisterService {
     }
   }
 
-  async _attemptSignupClick(page, button, maxRetries = 10) {
+  async _attemptSignupClick(page, button, maxRetries = 3) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       this.logger.debug(`Signup click attempt ${attempt}/${maxRetries}`);
 
       try {
-        await button.click({ force: true });
-        await this._randomDelay(2000, 3000);
+        // First check if button is still valid
+        const isVisible = await button.isVisible().catch(() => false);
+        if (!isVisible) {
+          this.logger.warn('Button no longer visible, getting fresh reference');
+          button = await page.$(this.formSelectors.signupButton);
+          if (!button) {
+            throw new Error('Could not find signup button');
+          }
+        }
+
+        // Click with more options for stability
+        await button.click({
+          force: true,
+          timeout: 5000,
+          delay: 100
+        });
+        
+        // Wait longer for response
+        await this._randomDelay(3000, 4000);
 
         // Check if we reached birthday page
         const birthdayVisible = await page
-          .$(this.formSelectors.birthdayMonth)
-          .then((el) => el?.isVisible())
+          .waitForSelector(this.formSelectors.birthdayMonth, {
+            timeout: 5000,
+            state: 'visible'
+          })
+          .then(() => true)
           .catch(() => false);
 
         if (birthdayVisible) {
@@ -285,25 +372,30 @@ class RegisterService {
           return true;
         }
 
-        this.logger.debug("Birthday fields not visible, retrying...");
+        this.logger.warn(`Birthday fields not visible after attempt ${attempt}`);
+        await takeScreenshot(page, `signup_click_attempt_${attempt}`);
+        
       } catch (error) {
-        this.logger.warn(`Click attempt ${attempt} failed:`, error);
+        this.logger.warn(`Click attempt ${attempt} failed: ${error.message}`);
+        await takeScreenshot(page, `signup_click_error_${attempt}`);
       }
 
-      // Wait between retries
+      // Longer wait between retries
       if (attempt < maxRetries) {
-        await this._randomDelay(1000, 2000);
+        await this._randomDelay(2000, 3000);
       }
     }
 
-    throw new Error(
-      `Failed to reach birthday page after ${maxRetries} attempts`
-    );
+    throw new Error(`Failed to reach birthday page after ${maxRetries} attempts`);
   }
 
   async _randomDelay(min, max) {
+    if (this.fastMode) {
+      await new Promise(resolve => setTimeout(resolve, 50)); // Minimal delay in fast mode
+      return;
+    }
     const delay = Math.floor(Math.random() * (max - min) + min);
-    await new Promise((resolve) => setTimeout(resolve, delay));
+    await new Promise(resolve => setTimeout(resolve, delay));
   }
 
   async _enterVerificationCode(page, code) {

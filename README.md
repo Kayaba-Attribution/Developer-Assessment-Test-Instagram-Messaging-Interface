@@ -1,5 +1,20 @@
 #### Testing
 
+cat ~/.config/adspower_global/cwd_global/source/local_api/
+http://local.adspower.com:50325/status
+
+{
+    "message": "feedback_required",
+    "spam": true,
+    "feedback_title": "Try Again Later",
+    "feedback_message": "We limit how often you can do certain things on Instagram to protect our community. Tell us if you think we made a mistake.",
+    "feedback_url": "repute/report_problem/scraping/",
+    "feedback_appeal_label": "Let us know",
+    "feedback_ignore_label": "OK",
+    "feedback_action": "report_problem",
+    "status": "fail"
+}
+
 **Full creation sequence:**
 `curl -X POST http://localhost:3000/api/v1/instagram/register  `
 
@@ -9,7 +24,7 @@
 ##### Get the latest code given an email Md5 hash
 `curl -X GET "http://localhost:3000/api/mail/messages/<hash>"`
 
-curl http://localhost:3000/api/v1/mail/code/0e64c846ca0ea0c8503b3ece899eb902
+curl http://localhost:3000/api/v1/mail/code/d5afc285a93854ed61858b82ac0644bd
 ##### Get new set of working proxies:
 
 
