@@ -1,13 +1,17 @@
 // src/config/index.js
 const path = require("path");
+// load .env file
+require('dotenv').config();
 
 const NODE_ENV = process.env.NODE_ENV || "development";
 const isDev = NODE_ENV === "development";
 
+
 const config = {
   development: {
     FAST_MODE: false,
-    ADS_POWER_USER: 'kqh9k11',
+    BROWSER_MODE: 'adspower', // 'adspower' or 'default' or 'no-proxy'
+    ADS_POWER_USER: 'kqhbqo5',
     OXYLABS_PROXY: {
       server: "http://pr.oxylabs.io:7777",
       username: process.env.OXYLABS_USERNAME,
@@ -44,6 +48,7 @@ const config = {
     },
   },
   production: {
+    BROWSER_MODE: 'default',
     logLevel: "info",
     headless: true,
     saveScreenshots: false,

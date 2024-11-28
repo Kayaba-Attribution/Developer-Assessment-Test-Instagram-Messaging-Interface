@@ -55,8 +55,7 @@ class BrowserService {
   async createPage(sessionData = null, proxy = null) {
     const fingerprint = this.generateFingerprint();
 
-    const proxyConfig = this.config.OXYLABS_PROXY;
-
+    let proxyConfig = this.config.OXYLABS_PROXY;
     this.logger.info("[BrowserService] Attempting to use proxy:", {
       server: proxyConfig.server,
       username: proxyConfig.username,
@@ -184,6 +183,12 @@ class BrowserService {
       const context = browser.contexts()[0];
       const page = await wrap(await context.newPage());
 
+      const ipInfo = await this.verifyProxy(page);
+      if (!ipInfo) {
+        this.logger.error("[BrowserService] Proxy verification failed!");
+        throw new Error("Proxy verification failed");
+      }
+
       await this.simulateHumanBehavior(page);
 
       return { browser, page, fingerprint };
@@ -239,6 +244,55 @@ class BrowserService {
     } catch (error) {
       this.logger.error("[ProxyCheck] Failed to verify proxy:", error);
       return null;
+    }
+  }
+
+  async createPageNoProxy(sessionData = null) {
+    const fingerprint = this.generateFingerprint();
+
+    const browser = await chromium.launch({
+      headless: this.config.headless,
+      args: [
+        ...this.browserConfig.BROWSER_ARGS,
+      ],
+      ignoreDefaultArgs: this.browserConfig.IGNORED_ARGS,
+    });
+
+    const context = await browser.newContext({
+      userAgent: fingerprint.userAgent,
+      viewport: fingerprint.viewport,
+      locale: fingerprint.language,
+      timezoneId: fingerprint.timezone,
+      geolocation: fingerprint.geolocation,
+      permissions: ["geolocation", "notifications"],
+      extraHTTPHeaders: {
+        "Accept-Language": fingerprint.language,
+        Referer: fingerprint.referer,
+        DNT: Math.random() > 0.5 ? "1" : "0",
+        "Sec-Ch-Ua": '"Chromium";v="119", "Google Chrome";v="119"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+      },
+      ...(sessionData && { storageState: sessionData }),
+    });
+
+    const page = await wrap(await context.newPage());
+    await this.simulateHumanBehavior(page);
+
+    return { browser, page, fingerprint };
+  }
+
+  async createPageWithMode(mode = 'default', sessionData = null, proxy = null) {
+    this.logger.info(`Creating page with mode: ${mode}`);
+    
+    switch (mode) {
+      case 'no-proxy':
+        return this.createPageNoProxy(sessionData);
+      case 'adspower':
+        return this.createPageAdsPower(sessionData, proxy);
+      case 'default':
+      default:
+        return this.createPage(sessionData, proxy);
     }
   }
 }

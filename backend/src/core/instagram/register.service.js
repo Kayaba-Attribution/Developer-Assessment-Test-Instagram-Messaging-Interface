@@ -36,23 +36,32 @@ class RegisterService {
 
     this.DIRECT_SIGNUP_URL = "https://www.instagram.com/accounts/emailsignup/";
     this.fastMode = config.FAST_MODE || false;
+    this.browserMode = config.BROWSER_MODE || 'default';
   }
 
   async register() {
     let browser, page, proxy;
 
     try {
-      proxy = await this.proxyService.getWorkingProxy();
+      proxy = this.browserMode === 'default' ? 
+        await this.proxyService.getWorkingProxy() : 
+        null;
+      // ! OXY proxy is hardcoded into create page default
+
       const registrationData = this._prepareRegistrationData();
 
-      const { browser, page } = await this.browserService.createPage(
-        null,
-        null
-      );
+      const { browser: newBrowser, page: newPage } = 
+        await this.browserService.createPageWithMode(
+          this.browserMode,
+          null,
+          proxy
+        );
+      
+      browser = newBrowser;
+      page = newPage;
 
       await this._navigateToSignup(page);
 
-      await page.waitForTimeout(10000);
       await this._fillRegistrationForm(page, registrationData);
 
       registrationData.status = "FORM_FILLED";
@@ -85,7 +94,7 @@ class RegisterService {
       const session = await this.sessionService.createInstagramSession({
         username: registrationData.username,
         sessionData: sessionState,
-        proxy: proxy?.server,
+        proxy: this.browserMode === 'default' ? proxy?.server : null,
       });
 
       return { success: true, data: { ...registrationData, session } };
@@ -93,7 +102,13 @@ class RegisterService {
       this.logger.error("Registration failed:", error);
       return { success: false, error: error.message };
     } finally {
-      if (browser) await browser.close();
+      if (browser) {
+        if (this.browserMode === 'adspower') {
+          await this._closeAdsPowerBrowser(browser);
+        } else {
+          await browser.close();
+        }
+      }
     }
   }
 
@@ -220,7 +235,9 @@ class RegisterService {
 
   async _fillRegistrationForm(page, data) {
     this.logger.debug(`Starting form fill with ${this.fastMode ? 'fast' : 'human-like'} behavior`);
-    await page.waitForTimeout(10000);
+
+    // Initial longer delay before starting form fill
+    await this._randomDelay(2000, 4000);
 
     const fields = [
       { selector: this.formSelectors.email, value: data.email },
@@ -230,28 +247,57 @@ class RegisterService {
     ];
 
     for (const field of fields) {
-      await page.waitForSelector(field.selector, {
-        state: "visible",
-        timeout: 10000,
-      });
+      try {
+        // Longer wait between fields to avoid rate limiting
+        await this._randomDelay(1500, 3000);
 
-      await page.click(field.selector);
-      await this._randomDelay(300, 800);
+        // Wait for selector with increased timeout
+        await page.waitForSelector(field.selector, {
+          state: "visible",
+          timeout: 15000,
+        });
 
-      if (this.fastMode) {
-        // Fast mode: type all at once
-        await page.type(field.selector, field.value);
-      } else {
-        // Normal mode: type character by character
-        for (const char of field.value) {
-          await page.type(field.selector, char, {
-            delay: Math.random() * 200 + 100,
-          });
-          await this._randomDelay(50, 150);
+        // Move mouse to element first (more human-like)
+        await page.hover(field.selector);
+        await this._randomDelay(300, 800);
+        
+        // Click with retry logic
+        let clicked = false;
+        for (let i = 0; i < 3 && !clicked; i++) {
+          try {
+            await page.click(field.selector);
+            clicked = true;
+          } catch (error) {
+            this.logger.warn(`Click attempt ${i + 1} failed for ${field.selector}`);
+            await this._randomDelay(1000, 2000);
+          }
         }
-      }
 
-      await this._randomDelay(500, 1500);
+        if (!clicked) {
+          throw new Error(`Failed to click ${field.selector} after 3 attempts`);
+        }
+
+        await this._randomDelay(800, 1500);
+
+        if (this.fastMode) {
+          await page.type(field.selector, field.value, { delay: 50 });
+        } else {
+          // More random delays between characters
+          for (const char of field.value) {
+            await page.type(field.selector, char, {
+              delay: Math.random() * 250 + 100,
+            });
+            await this._randomDelay(100, 300);
+          }
+        }
+
+        // Longer delay after filling each field
+        await this._randomDelay(1500, 3000);
+      } catch (error) {
+        this.logger.error(`Error filling field ${field.selector}:`, error);
+        await takeScreenshot(page, `field_error_${field.selector}`);
+        throw error;
+      }
     }
 
     this.logger.debug("Form filled, clicking signup button");
@@ -431,8 +477,6 @@ class RegisterService {
 
       await this._randomDelay(500, 1000);
 
-      // wait 40 seconds
-      await page.waitForTimeout(40000);
       await nextButton.click();
 
       // Wait for navigation or success state
@@ -502,6 +546,24 @@ class RegisterService {
 
   getRegistrationStatus(username) {
     return this.registrationAttempts.get(username);
+  }
+
+  async _closeAdsPowerBrowser(browser) {
+    try {
+      const userId = this.config.ADS_POWER_USER;
+      const closeUrl = `http://local.adspower.net:50325/api/v1/browser/stop?user_id=${userId}`;
+      
+      await fetch(closeUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      await browser.close();
+    } catch (error) {
+      this.logger.error('Failed to close AdsPower browser:', error);
+    }
   }
 }
 
