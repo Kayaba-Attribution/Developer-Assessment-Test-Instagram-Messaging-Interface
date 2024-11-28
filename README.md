@@ -12,11 +12,13 @@
 curl http://localhost:3000/api/v1/mail/code/0e64c846ca0ea0c8503b3ece899eb902
 ##### Get new set of working proxies:
 
-https://dashboard.webshare.io/proxy/list?source=welcome-new&authenticationMethod=%22username_password%22&connectionMethod=%22direct%22&proxyControl=%220%22&rowsPerPage=10&page=0&order=%22asc%22&orderBy=null&searchValue=%22%22&modals=eyJmaWx0ZXJCeUNvdW50cnlPcGVuIjpmYWxzZX0%253D
 
-http://185.206.71.91:9090 -> worked
+Device
+Do not launch multiple accounts on the same device, as this increases the risk of them being linked and banned. You must use specialized software to spoof fingerprints and make each account appear as if it is using a different device. 1 account - 1 device.
 
-{"id":"bb32b8b30906d7018958ea75537627ef","from":"\"Instagram\" <security@mail.instagram.com>","subject":"Verify your account","timestamp":1732659380.242,"verificationCode":null},{"id":"42d44ff31136f9114b42fc46537496a7","from":"\"Instagram\" <security@mail.instagram.com>","subject":"Verify your account","timestamp":1732659565.548,"verificationCode":null}
+
+Anti-detect Browser
+If you plan to use accounts manually, don’t log in to accounts from regular browsers such as Brave, Opera, Firefox, Chrome, etc. Use anti-detect browsers like Multilogin, AdsPower, or similar tools. For Telegram accounts, you must purchase specific software, as regular browsers do not work with them.
 
 info: Filling form with data: {
   "email": "manish.winhold.b2f819af@tgvis.com",

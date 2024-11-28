@@ -205,25 +205,8 @@ class RegisterService {
       throw new Error("Signup button is disabled - form validation failed");
     }
 
-    // Try multiple click methods if needed
-    try {
-      await button.click({ timeout: 5000 });
-    } catch (clickError) {
-      this.logger.warn("Direct click failed, trying alternative methods");
-
-      // Try JavaScript click as fallback
-      await page.evaluate((selector) => {
-        document.querySelector(selector).click();
-      }, this.formSelectors.signupButton);
-    }
-
-    // Verify navigation or state change
-    await Promise.race([
-      page.waitForNavigation({ timeout: 10000 }).catch(() => {}),
-      page.waitForSelector(this.formSelectors.birthdayMonth, {
-        timeout: 10000,
-      }),
-    ]);
+    // Click the button
+    await this._attemptSignupClick(page, button);
 
     // Proceed with birthday selection
     await this._setBirthday(page, data.birthday);
@@ -283,6 +266,41 @@ class RegisterService {
     }
   }
 
+  async _attemptSignupClick(page, button, maxRetries = 10) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      this.logger.debug(`Signup click attempt ${attempt}/${maxRetries}`);
+
+      try {
+        await button.click({ force: true });
+        await this._randomDelay(2000, 3000);
+
+        // Check if we reached birthday page
+        const birthdayVisible = await page
+          .$(this.formSelectors.birthdayMonth)
+          .then((el) => el?.isVisible())
+          .catch(() => false);
+
+        if (birthdayVisible) {
+          this.logger.debug("Successfully reached birthday page");
+          return true;
+        }
+
+        this.logger.debug("Birthday fields not visible, retrying...");
+      } catch (error) {
+        this.logger.warn(`Click attempt ${attempt} failed:`, error);
+      }
+
+      // Wait between retries
+      if (attempt < maxRetries) {
+        await this._randomDelay(1000, 2000);
+      }
+    }
+
+    throw new Error(
+      `Failed to reach birthday page after ${maxRetries} attempts`
+    );
+  }
+
   async _randomDelay(min, max) {
     const delay = Math.floor(Math.random() * (max - min) + min);
     await new Promise((resolve) => setTimeout(resolve, delay));
@@ -319,30 +337,23 @@ class RegisterService {
         }
       );
 
-      // Verify button state
-      const isDisabled = await nextButton.evaluate(
-        (el) => el.getAttribute("aria-disabled") === "true"
-      );
-      if (isDisabled) {
-        throw new Error(
-          "Verification code appears invalid - next button disabled"
-        );
-      }
-
       await this._randomDelay(500, 1000);
+
+      // wait 40 seconds
+      await page.waitForTimeout(40000);
       await nextButton.click();
 
       // Wait for navigation or success state
-      await Promise.race([
-        page.waitForNavigation({ timeout: 10000 }),
-        page.waitForSelector('text="Welcome to Instagram"', { timeout: 10000 }),
-      ]);
+      await page.waitForLoadState("networkidle", { timeout: 30000 });
+
+      await takeScreenshot(page, "registration_complete");
     } catch (error) {
       this.logger.error("Verification code entry failed:", error);
       await takeScreenshot(page, "verification_error");
       throw error;
     }
   }
+
   async _getVerificationCode(emailHash) {
     const maxAttempts = 5;
     let attempt = 0;

@@ -56,23 +56,15 @@ class BrowserService {
     const fingerprint = this.generateFingerprint();
 
     const proxyConfig = {
-      server: 'http://pr.oxylabs.io:7777',
-      username: 'customer-posty_oQQDk',
-      password: 'bv6sfaQedBJtdbt4D6Uc+'
+      server: "http://pr.oxylabs.io:7777",
+      username: "customer-posty_oQQDk",
+      password: "bv6sfaQedBJtdbt4D6Uc+",
     };
 
-    this.logger.info(`[BrowserService] Configured proxy: ${JSON.stringify(proxyConfig)}`);
-    // this.logger.info("[BrowserService] Using proxy:", proxy);
-    // if (proxy?.server) {
-    //   try {
-    //     const [, host, port] = proxy.server.match(/http:\/\/([^:]+):(\d+)/);
-    //     proxyServer = `http://${host}:${port}`;
-    //     this.logger.info(`[BrowserService] Configured proxy: ${proxyServer}`);
-    //   } catch (error) {
-    //     this.logger.error(`[BrowserService] Invalid proxy format: ${proxy.server}`);
-    //     throw new Error('Invalid proxy format');
-    //   }
-    // }
+    this.logger.info("[BrowserService] Attempting to use proxy:", {
+      server: proxyConfig.server,
+      username: proxyConfig.username,
+    });
 
     const browser = await chromium.launch({
       headless: this.config.headless,
@@ -99,11 +91,13 @@ class BrowserService {
         "Sec-Ch-Ua-Platform": '"Windows"',
       },
       ...(sessionData && { storageState: sessionData }),
-      ...(proxyConfig && { proxy: { 
-        server: proxyConfig.server,
-        username: proxyConfig.username,
-        password: proxyConfig.password
-      } }),
+      ...(proxyConfig && {
+        proxy: {
+          server: proxyConfig.server,
+          username: proxyConfig.username,
+          password: proxyConfig.password,
+        },
+      }),
     });
 
     await context.addInitScript(() => {
@@ -149,6 +143,12 @@ class BrowserService {
 
     const page = await wrap(await context.newPage());
 
+    const ipInfo = await this.verifyProxy(page);
+    if (!ipInfo) {
+      this.logger.error("[BrowserService] Proxy verification failed!");
+      throw new Error("Proxy verification failed");
+    }
+
     // Add mouse movement simulation
     await this.simulateHumanBehavior(page);
 
@@ -172,6 +172,36 @@ class BrowserService {
     const path = `${this.config.screenshotsDir}/${name}_${timestamp}_${randomSuffix}.png`;
     await page.screenshot({ path });
     return path;
+  }
+
+  async verifyProxy(page) {
+    try {
+      // Check IP using multiple services for redundancy
+      const ipChecks = [
+        "https://api.ipify.org?format=json",
+        "https://ifconfig.me/all.json",
+        "https://ip.seeip.org/jsonip",
+      ];
+
+      for (const url of ipChecks) {
+        try {
+          const response = await page.evaluate(async (url) => {
+            const res = await fetch(url);
+            return res.json();
+          }, url);
+
+          this.logger.info(`[ProxyCheck] IP Details:`, response);
+          return response;
+        } catch (e) {
+          continue; // Try next service if one fails
+        }
+      }
+
+      throw new Error("All IP check services failed");
+    } catch (error) {
+      this.logger.error("[ProxyCheck] Failed to verify proxy:", error);
+      return null;
+    }
   }
 }
 

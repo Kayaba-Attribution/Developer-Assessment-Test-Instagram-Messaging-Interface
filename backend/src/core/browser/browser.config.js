@@ -1,7 +1,7 @@
 // src/core/browser/browser.config.js
 
-const browerWidth = 1920;
-const browserHeight = 1080;
+const browerWidth = 1280;
+const browserHeight = 720;
 
 const BROWSER_CONFIG = {
   IGNORED_ARGS: ["--enable-automation", "--disable-extensions"],
@@ -23,6 +23,7 @@ const BROWSER_CONFIG = {
     "--password-store=basic",
     "--use-fake-ui-for-media-stream",
     "--disable-sync",
+    '--no-zygote',
   ],
 
   USER_AGENTS: [
