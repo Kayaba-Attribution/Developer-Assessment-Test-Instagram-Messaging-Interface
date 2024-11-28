@@ -55,8 +55,13 @@ class BrowserService {
   async createPage(sessionData = null, proxy = null) {
     const fingerprint = this.generateFingerprint();
 
-    let proxyServer = `http://104.207.35.73:3128`;
-    this.logger.info(`[BrowserService] Configured proxy: ${proxyServer}`);
+    const proxyConfig = {
+      server: 'http://pr.oxylabs.io:7777',
+      username: 'customer-posty_oQQDk',
+      password: 'bv6sfaQedBJtdbt4D6Uc+'
+    };
+
+    this.logger.info(`[BrowserService] Configured proxy: ${JSON.stringify(proxyConfig)}`);
     // this.logger.info("[BrowserService] Using proxy:", proxy);
     // if (proxy?.server) {
     //   try {
@@ -73,7 +78,7 @@ class BrowserService {
       headless: this.config.headless,
       args: [
         ...this.browserConfig.BROWSER_ARGS,
-        ...(proxyServer ? [`--proxy-server=${proxyServer}`] : []),
+        ...(proxyConfig ? [`--proxy-server=${proxyConfig.server}`] : []),
       ],
       ignoreDefaultArgs: this.browserConfig.IGNORED_ARGS,
     });
@@ -94,7 +99,11 @@ class BrowserService {
         "Sec-Ch-Ua-Platform": '"Windows"',
       },
       ...(sessionData && { storageState: sessionData }),
-      ...(proxyServer && { proxy: { server: proxyServer } }),
+      ...(proxyConfig && { proxy: { 
+        server: proxyConfig.server,
+        username: proxyConfig.username,
+        password: proxyConfig.password
+      } }),
     });
 
     await context.addInitScript(() => {

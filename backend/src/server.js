@@ -1,7 +1,9 @@
 // src/server.js
 require("dotenv").config();
 const express = require("express");
+const cors = require('cors');
 const container = require("./container");
+const cleanup = require("./utils/cleanup");
 const configureExpress = require("./config/express.config");
 
 /**
@@ -16,9 +18,18 @@ const configureExpress = require("./config/express.config");
  */
 async function startServer() {
   try {
+
+    // Pre Hook Clear the debug screenshots
+    await cleanup();
+
     // 1. Core initialization
     await container.initialize();
     const app = express();
+
+    // Core middleware
+    app.use(cors());
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
     const logger = container.get("logger");
 
     // 2. Express and auth setup
@@ -26,6 +37,7 @@ async function startServer() {
       container.get("db"),
       logger
     );
+
     configureExpress(app, passportInstance);
 
     // 3. Route mounting
@@ -50,12 +62,17 @@ async function startServer() {
  */
 function mountRoutes(app) {
   // Auth routes
-  app.use('/api/v1/auth', require('./api/v1/routes/auth.routes'));
+  app.use("/api/v1/auth", require("./api/v1/routes/auth.routes"));
+
+  app.use('/api/v1/mail', require('./api/v1/routes/mail.routes')); 
 
   // Instagram routes
-  app.use('/api/v1/instagram', require('./api/v1/routes/instagram.routes')({
-    instagramController: container.get('instagramController')
-  }));
+  app.use(
+    "/api/v1/instagram",
+    require("./api/v1/routes/instagram.routes")({
+      instagramController: container.get("instagramController"),
+    })
+  );
 }
 
 /**

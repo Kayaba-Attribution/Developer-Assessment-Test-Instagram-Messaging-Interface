@@ -75,7 +75,7 @@ class RegisterService {
       await this._enterVerificationCode(page, verificationCode);
 
       await page.waitForTimeout(50000);
-      
+
       const sessionState = await browser.contexts()[0].storageState();
       const session = await this.sessionService.createInstagramSession({
         username: registrationData.username,
@@ -123,6 +123,7 @@ class RegisterService {
 
       // Click the button
       await signUpLink.click();
+      page.waitForTimeout(500);
 
       // Wait for navigation or next state
       await Promise.race([
@@ -131,6 +132,11 @@ class RegisterService {
           .catch(() => {}),
         page.waitForTimeout(2000),
       ]);
+
+      // check url to ensure navigation
+      if (!page.url().includes("/accounts/emailsignup/")) {
+        throw new Error("Failed to navigate to registration page");
+      }
 
       // Take screenshot
       await takeScreenshot(page, "navigated_to_registration");
@@ -144,9 +150,8 @@ class RegisterService {
   }
 
   async _fillRegistrationForm(page, data) {
-    this.logger.debug(
-      `Filling form with data: ${JSON.stringify(data, null, 2)}`
-    );
+    this.logger.debug(`Starting form fill with human-like behavior`);
+
     const fields = [
       { selector: this.formSelectors.email, value: data.email },
       { selector: this.formSelectors.fullName, value: data.fullName },
@@ -155,47 +160,189 @@ class RegisterService {
     ];
 
     for (const field of fields) {
-      await page.waitForSelector(field.selector);
-      await page.fill(field.selector, field.value);
-      await page.waitForTimeout(Math.random() * 200 + 300);
+      await page.waitForSelector(field.selector, {
+        state: "visible",
+        timeout: 10000,
+      });
+
+      // Click the field first
+      await page.click(field.selector);
+      await this._randomDelay(300, 800);
+
+      // Type character by character with random delays
+      for (const char of field.value) {
+        await page.type(field.selector, char, {
+          delay: Math.random() * 200 + 100,
+        });
+        await this._randomDelay(50, 150);
+      }
+
+      // Random pause between fields
+      await this._randomDelay(500, 1500);
     }
 
-    // Take screenshot before submission
-    await takeScreenshot(page, "registration_form_filled");
+    this.logger.debug("Form filled, clicking signup button");
 
-    await page.click(this.formSelectors.signupButton);
-    this.logger.debug("Init Form submitted, waiting for next step");
+    await takeScreenshot(page, "pre_signup_click");
+
+    // Wait for the button to be ready
+    await page.waitForSelector(this.formSelectors.signupButton, {
+      state: "visible",
+      timeout: 10000,
+    });
+
+    // Ensure button is both visible and enabled
+    const button = await page.$(this.formSelectors.signupButton);
+    const isDisabled = await button.evaluate((el) => el.disabled);
+
+    if (!button) {
+      this.logger.error("Signup button not found");
+      throw new Error("Signup button not found");
+    }
+
+    if (isDisabled) {
+      this.logger.error("Signup button is disabled");
+      throw new Error("Signup button is disabled - form validation failed");
+    }
+
+    // Try multiple click methods if needed
+    try {
+      await button.click({ timeout: 5000 });
+    } catch (clickError) {
+      this.logger.warn("Direct click failed, trying alternative methods");
+
+      // Try JavaScript click as fallback
+      await page.evaluate((selector) => {
+        document.querySelector(selector).click();
+      }, this.formSelectors.signupButton);
+    }
+
+    // Verify navigation or state change
+    await Promise.race([
+      page.waitForNavigation({ timeout: 10000 }).catch(() => {}),
+      page.waitForSelector(this.formSelectors.birthdayMonth, {
+        timeout: 10000,
+      }),
+    ]);
+
+    // Proceed with birthday selection
     await this._setBirthday(page, data.birthday);
   }
 
   async _setBirthday(page, birthday) {
-    await page.selectOption(
-      this.formSelectors.birthdayMonth,
-      birthday.month.toString()
-    );
-    await page.waitForTimeout(Math.random() * 100 + 100);
-    await page.selectOption(
-      this.formSelectors.birthdayDay,
-      birthday.day.toString()
-    );
-    await page.waitForTimeout(Math.random() * 100 + 100);
-    await page.selectOption(
-      this.formSelectors.birthdayYear,
-      birthday.year.toString()
-    );
-    await page.waitForTimeout(Math.random() * 100 + 100);
-    await takeScreenshot(page, "birthday_set");
-    this.logger.debug("Birthday set, clicking next");
-    await page.click(this.formSelectors.next);
+    try {
+      // Wait for all birthday selectors to be visible
+      await Promise.all([
+        page.waitForSelector(this.formSelectors.birthdayMonth, {
+          state: "visible",
+          timeout: 15000,
+        }),
+        page.waitForSelector(this.formSelectors.birthdayDay, {
+          state: "visible",
+          timeout: 15000,
+        }),
+        page.waitForSelector(this.formSelectors.birthdayYear, {
+          state: "visible",
+          timeout: 15000,
+        }),
+      ]);
+
+      // Add random delays between selections
+      await this._randomDelay(500, 1000);
+      await page.selectOption(
+        this.formSelectors.birthdayMonth,
+        birthday.month.toString()
+      );
+
+      await this._randomDelay(300, 800);
+      await page.selectOption(
+        this.formSelectors.birthdayDay,
+        birthday.day.toString()
+      );
+
+      await this._randomDelay(300, 800);
+      await page.selectOption(
+        this.formSelectors.birthdayYear,
+        birthday.year.toString()
+      );
+
+      await takeScreenshot(page, "birthday_set");
+
+      // Wait for next button and ensure it's clickable
+      await page.waitForSelector(this.formSelectors.next, {
+        state: "visible",
+        timeout: 10000,
+      });
+      await this._randomDelay(500, 1000);
+
+      await page.click(this.formSelectors.next);
+    } catch (error) {
+      this.logger.error("Birthday selection failed:", error);
+      await takeScreenshot(page, "birthday_selection_error");
+      throw new Error(`Birthday selection failed: ${error.message}`);
+    }
+  }
+
+  async _randomDelay(min, max) {
+    const delay = Math.floor(Math.random() * (max - min) + min);
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
   async _enterVerificationCode(page, code) {
-    await page.waitForSelector(this.formSelectors.verificationCode);
-    await page.fill(this.formSelectors.verificationCode, code);
-    await page.click(this.formSelectors.nextButton);
-    await page.waitForTimeout(3000);
-  }
+    try {
+      // Wait for verification input with proper timeout
+      await page.waitForSelector(this.formSelectors.verificationCode, {
+        state: "visible",
+        timeout: 15000,
+      });
 
+      // Click field first (human behavior)
+      await page.click(this.formSelectors.verificationCode);
+      await this._randomDelay(300, 600);
+
+      // Type code character by character
+      for (const char of code) {
+        await page.type(this.formSelectors.verificationCode, char, {
+          delay: Math.random() * 100 + 50,
+        });
+      }
+
+      // Screenshot for debugging
+      await takeScreenshot(page, "verification_code_entered");
+
+      // Wait and verify next button
+      const nextButton = await page.waitForSelector(
+        this.formSelectors.nextButton,
+        {
+          state: "visible",
+          timeout: 10000,
+        }
+      );
+
+      // Verify button state
+      const isDisabled = await nextButton.evaluate(
+        (el) => el.getAttribute("aria-disabled") === "true"
+      );
+      if (isDisabled) {
+        throw new Error(
+          "Verification code appears invalid - next button disabled"
+        );
+      }
+
+      await this._randomDelay(500, 1000);
+      await nextButton.click();
+
+      // Wait for navigation or success state
+      await Promise.race([
+        page.waitForNavigation({ timeout: 10000 }),
+        page.waitForSelector('text="Welcome to Instagram"', { timeout: 10000 }),
+      ]);
+    } catch (error) {
+      this.logger.error("Verification code entry failed:", error);
+      await takeScreenshot(page, "verification_error");
+      throw error;
+    }
+  }
   async _getVerificationCode(emailHash) {
     const maxAttempts = 5;
     let attempt = 0;
@@ -204,6 +351,7 @@ class RegisterService {
       try {
         const code = await this.emailService.getVerificationCode(emailHash);
         if (code) return code;
+        this.logger.debug("Verification code not found, retrying");
         await new Promise((resolve) => setTimeout(resolve, 5000));
         attempt++;
       } catch (error) {

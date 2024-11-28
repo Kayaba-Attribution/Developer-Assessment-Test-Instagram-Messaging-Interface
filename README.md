@@ -1,16 +1,18 @@
 #### Testing
 
 **Full creation sequence:**
-`curl -X POST http://localhost:3000/api/instagram/register -H "Content-Type: application/json"`
+`curl -X POST http://localhost:3000/api/v1/instagram/register  `
 
 ##### Create a new email:
-`curl -X POST http://localhost:3000/api/mail/create -H "Content-Type: application/json"`
+`curl -X POST http://localhost:3000/api/v1/mail/generate"`
 
 ##### Get the latest code given an email Md5 hash
 `curl -X GET "http://localhost:3000/api/mail/messages/<hash>"`
 
-curl -X GET "http://localhost:3000/api/mail/code/7d34dcac2824ea43235ccc884fbeae13"
+curl http://localhost:3000/api/v1/mail/code/0e64c846ca0ea0c8503b3ece899eb902
 ##### Get new set of working proxies:
+
+https://dashboard.webshare.io/proxy/list?source=welcome-new&authenticationMethod=%22username_password%22&connectionMethod=%22direct%22&proxyControl=%220%22&rowsPerPage=10&page=0&order=%22asc%22&orderBy=null&searchValue=%22%22&modals=eyJmaWx0ZXJCeUNvdW50cnlPcGVuIjpmYWxzZX0%253D
 
 http://185.206.71.91:9090 -> worked
 
