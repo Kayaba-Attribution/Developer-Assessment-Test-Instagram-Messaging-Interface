@@ -10,8 +10,8 @@ const config = {
     ADS_POWER_USER: 'kqh9k11',
     OXYLABS_PROXY: {
       server: "http://pr.oxylabs.io:7777",
-      username: "customer-posty_oQQDk",
-      password: "bv6sfaQedBJtdbt4D6Uc+",
+      username: process.env.OXYLABS_USERNAME,
+      password: process.env.OXYLABS_PASSWORD,
     },
     logLevel: "debug",
     headless: false,
