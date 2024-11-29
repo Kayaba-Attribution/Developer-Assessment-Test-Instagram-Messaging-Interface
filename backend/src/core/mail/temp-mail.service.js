@@ -79,9 +79,52 @@ class TempMailService {
       this.firstNames[Math.floor(Math.random() * this.firstNames.length)];
     const randomLastName =
       this.lastNames[Math.floor(Math.random() * this.lastNames.length)];
-    const uniqueIdentifier = crypto.randomBytes(4).toString("hex");
-    const finalPrefix =
-      prefix || `${randomFirstName}.${randomLastName}.${uniqueIdentifier}`;
+
+    // Randomly select one of the four unique identifier formats
+    const identifierType = Math.floor(Math.random() * 4);
+    let uniqueIdentifier;
+
+    switch (identifierType) {
+      case 0:
+        // 4 digit number between 1944 to 2010
+        uniqueIdentifier = Math.floor(Math.random() * (2010 - 1944 + 1)) + 1944;
+        break;
+      case 1:
+        // 4 digit number between 1944 to 2010 with swapped digits
+        const year = Math.floor(Math.random() * (2010 - 1944 + 1)) + 1944;
+        uniqueIdentifier = `${year.toString().slice(2)}${year.toString().slice(0, 2)}`;
+        break;
+      case 2:
+        // Any 2 digit number from 00 to 99
+        uniqueIdentifier = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+        break;
+      case 3:
+        // Any 3 letters
+        uniqueIdentifier = Array.from({ length: 3 }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+        break;
+    }
+
+    // Randomly select one of the three formats for the email prefix
+    const formatType = Math.floor(Math.random() * 3);
+    let finalPrefix;
+
+    switch (formatType) {
+      case 0:
+        finalPrefix = `${randomFirstName}${randomLastName}${uniqueIdentifier}`;
+        break;
+      case 1:
+        finalPrefix = `${randomFirstName}_${randomLastName}${uniqueIdentifier}`;
+        break;
+      case 2:
+        finalPrefix = `${randomFirstName}.${randomLastName}${uniqueIdentifier}`;
+        break;
+      case 3:
+        finalPrefix = `${randomFirstName}${String.fromCharCode(
+          97 + Math.floor(Math.random() * 26)
+        )}${randomLastName}${uniqueIdentifier}`;
+        break;
+    }
+
     const randomDomain =
       this.domains[Math.floor(Math.random() * this.domains.length)];
     const email = finalPrefix + randomDomain;
