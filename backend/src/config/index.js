@@ -8,7 +8,7 @@ const isDev = NODE_ENV === "development";
 
 const config = {
   development: {
-    FAST_MODE: false,
+    FAST_MODE: true,
     BROWSER_MODE: "adspower", // 'adspower' or 'default' or 'no-proxy'
     ADS_POWER_USER: "kqhbqo5",
     OXYLABS_PROXY: {

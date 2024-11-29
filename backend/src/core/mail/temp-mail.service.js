@@ -87,6 +87,7 @@ class TempMailService {
     const email = finalPrefix + randomDomain;
 
     return {
+      fullName: `${randomFirstName} ${randomLastName}`,
       email,
       hash: crypto.createHash("md5").update(email).digest("hex"),
     };
@@ -112,13 +113,6 @@ class TempMailService {
     }
   }
 
-  generateFullName() {
-    const firstName =
-      this.firstNames[Math.floor(Math.random() * this.firstNames.length)];
-    const lastName =
-      this.lastNames[Math.floor(Math.random() * this.lastNames.length)];
-    return `${firstName} ${lastName}`;
-  }
 
   extractVerificationCode(subject) {
     if (!subject) return null;

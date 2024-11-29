@@ -51,16 +51,16 @@ class RegisterService {
 
       const { browser: newBrowser, page: newPage } = 
         await this.browserService.createPageWithMode(
-          this.browserMode,
-          null,
-          proxy
+          this.browserMode, // mode 
+          null,             // sessionData
+          proxy             // proxy
         );
       
       browser = newBrowser;
       page = newPage;
 
       const navigationResult = await this._navigateToSignup(page);
-      
+
       if (navigationResult && !navigationResult.success && navigationResult.status === "SUSPENDED") {
         return navigationResult;
       }
@@ -77,6 +77,7 @@ class RegisterService {
         "Registration form filled, waiting for verification code"
       );
 
+      // ? Wait for mail service to get the email
       await page.waitForTimeout(6000);
 
       const verificationCode = await this._getVerificationCode(
@@ -580,7 +581,7 @@ class RegisterService {
       email: emailData.email,
       emailHash: emailData.hash,
       username: `${emailPrefix}_${Date.now().toString().slice(-4)}`,
-      fullName: this._generateFullName(),
+      fullName: emailData.fullName,
       password: this._generateSecurePassword(),
       birthday: this._generateBirthday(),
       status: "INITIALIZED",
@@ -598,10 +599,6 @@ class RegisterService {
       month: 1 + Math.floor(Math.random() * 12),
       day: 1 + Math.floor(Math.random() * 28),
     };
-  }
-
-  _generateFullName() {
-    return this.emailService.generateFullName();
   }
 
   getRegistrationStatus(username) {

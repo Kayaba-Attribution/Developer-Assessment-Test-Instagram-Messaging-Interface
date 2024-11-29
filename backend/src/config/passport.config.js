@@ -40,20 +40,33 @@ module.exports = (db, logger) => {
   );
 
   passport.serializeUser((user, done) => {
-    done(null, user._id.toString());
+    try {
+      if (!user || !user._id) {
+        return done(null, false);
+      }
+      done(null, user._id.toString());
+    } catch (error) {
+      logger.error("Serialize user error:", error);
+      done(null, false);
+    }
   });
 
   passport.deserializeUser(async (id, done) => {
     try {
+      if (!id) {
+        return done(null, false);
+      }
+      
       const users = await db.getCollection("users");
       const user = await users.findOne({ _id: new ObjectId(id) });
+      
       if (!user) {
-        return done(new Error("User not found"), null);
+        return done(null, false);
       }
       done(null, user);
     } catch (error) {
       logger.error("Deserialize error:", error);
-      done(error, null);
+      done(null, false);
     }
   });
 
