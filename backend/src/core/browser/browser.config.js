@@ -54,6 +54,7 @@ const BROWSER_CONFIG = {
     "https://duckduckgo.com",
   ],
   VIEWPORT_JITTER: 50, // pixels of random variation
+  ADS_POWER_GROUP_ID: "1",
 };
 
 module.exports = { BROWSER_CONFIG };

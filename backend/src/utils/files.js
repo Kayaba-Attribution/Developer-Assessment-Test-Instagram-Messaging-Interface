@@ -44,7 +44,7 @@ async function takeScreenshot(page, name) {
   );
   await page.screenshot({ path: screenshotPath, fullPage: true });
   if (isDev) {
-    logger.info(`Screenshot saved: ${screenshotPath}`);
+    logger.debug(`Screenshot saved: ${screenshotPath}`);
   }
   return screenshotPath;
 }

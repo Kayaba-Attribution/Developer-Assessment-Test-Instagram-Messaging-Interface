@@ -3,6 +3,7 @@ const { chromium } = require("playwright");
 const { wrap } = require("agentql");
 const crypto = require("crypto");
 const { BROWSER_CONFIG } = require("./browser.config");
+const fetch = require('node-fetch');
 
 class BrowserService {
   constructor(config, logger) {
@@ -119,12 +120,64 @@ class BrowserService {
     }
   }
 
-  // AdsPower Manages Fingerprint
-  async createPageAdsPower(sessionData = null, proxy = null) {
-    const userId = this.config.ADS_POWER_USER;
+  async createAdsProfile(useProxy = false) {
 
+    if (useProxy) {
+      this.logger.info("[BrowserService] Creating AdsPower profile with proxy");
+    } else {
+      this.logger.info("[BrowserService] Creating AdsPower profile without proxy");
+    }
     try {
-      // First, attempt to delete the cache
+      const profileData = {
+        name: `Profile_${Date.now()}`,
+        group_id: this.config.ADS_POWER_GROUP_ID || "0",
+        ...(useProxy 
+          ? { proxyid: "1" }  // Use proxy ID 1 when useProxy is true
+          : { user_proxy_config: { proxy_soft: "no_proxy" } }  // No proxy configuration
+        ),
+        fingerprint_config: {
+          automatic_timezone: "1",
+          language: ["en-US", "en"],
+          flash: "block",
+          webrtc: "disabled",
+          ua: this.browserConfig.USER_AGENTS[
+            Math.floor(Math.random() * this.browserConfig.USER_AGENTS.length)
+          ],
+          resolution: `${this.browserConfig.BROWSER_WIDTH}x${this.browserConfig.BROWSER_HEIGHT}`,
+        }
+      };
+
+      const response = await fetch('http://local.adspower.net:50325/api/v1/user/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData)
+      });
+
+      const data = await response.json();
+      
+      if (data.code !== 0) {
+        throw new Error(`Failed to create AdsPower profile: ${data.msg}`);
+      }
+
+      this.logger.info('[BrowserService] Created new AdsPower profile:', {
+        id: data.data.id,
+        useProxy: useProxy
+      });
+      return data.data.id;
+    } catch (error) {
+      this.logger.error('[BrowserService] Failed to create AdsPower profile:', error);
+      throw error;
+    }
+  }
+
+  async createPageAdsPower(sessionData = null, proxy = null) {
+    try {
+      // Create a new profile with proxy flag based on proxy parameter
+      const userId = await this.createAdsProfile(!!proxy);
+      
+      // Delete cache (existing code)
       this.logger.info("[BrowserService] Attempting to delete AdsPower cache");
       const deleteCacheResponse = await fetch(
         "http://local.adspower.net:50325/api/v1/user/delete-cache",
@@ -197,7 +250,7 @@ class BrowserService {
 
       await this.simulateHumanBehavior(page);
 
-      return { browser, page };
+      return { browser, page, userId };
     } catch (error) {
       this.logger.error("[BrowserService] AdsPower connection failed:", error);
       throw new Error(`Failed to connect to AdsPower: ${error.message}`);

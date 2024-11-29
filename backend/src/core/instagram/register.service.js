@@ -40,28 +40,34 @@ class RegisterService {
   }
 
   async register(userId) {
-    let browser, page, proxy;
+    let browser, page, proxy, adsProfileId;
 
     try {
-      proxy = this.browserMode === 'default' ? 
-        await this.proxyService.getWorkingProxy() : 
-        null;
+      proxy =
+        this.browserMode === "default"
+          ? await this.proxyService.getWorkingProxy()
+          : null;
 
       const registrationData = this._prepareRegistrationData();
 
-      const { browser: newBrowser, page: newPage } = 
+      const { browser: newBrowser, page: newPage, userId: newUserId } =
         await this.browserService.createPageWithMode(
-          this.browserMode, // mode 
-          null,             // sessionData
-          proxy             // proxy
+          this.browserMode,
+          null,
+          proxy
         );
-      
+
       browser = newBrowser;
       page = newPage;
+      adsProfileId = newUserId;
 
       const navigationResult = await this._navigateToSignup(page);
 
-      if (navigationResult && !navigationResult.success && navigationResult.status === "SUSPENDED") {
+      if (
+        navigationResult &&
+        !navigationResult.success &&
+        navigationResult.status === "SUSPENDED"
+      ) {
         return navigationResult;
       }
 
@@ -90,10 +96,23 @@ class RegisterService {
 
       this.logger.debug(`Verification code received: ${verificationCode}`);
 
-      await this._enterVerificationCode(page, verificationCode);
+      try {
+        await this._enterVerificationCode(page, verificationCode);
+      } catch (error) {
+        if (error.type === "SUSPENDED") {
+          return {
+            success: false,
+            error: "ACCOUNT_SUSPENDED",
+            status: "SUSPENDED",
+            message: error.message,
+          };
+        }
+        throw error; // Re-throw other errors
+      }
 
-      await page.waitForTimeout(50000);
+      await takeScreenshot(page, "registration_complete");
 
+      this.logger.info("Registration complete, saving session...");
       const context = browser.contexts()[0];
       const cookies = await context.cookies();
       const sessionState = {
@@ -109,9 +128,21 @@ class RegisterService {
         sessionState
       );
 
-      this.logger.info(
-        `Session saved for new account ${registrationData.username}`
-      );
+      if (session) {
+        this.logger.info(
+          `Session saved for new account ${registrationData.username}`
+        );
+      } else {
+        this.logger.error("Failed to save session");
+      }
+
+      if (browser) {
+        if (this.browserMode === "adspower") {
+          await this._closeAdsPowerBrowser(browser, adsProfileId);
+        } else {
+          await browser.close();
+        }
+      }
 
       return {
         success: true,
@@ -127,7 +158,7 @@ class RegisterService {
     } finally {
       if (browser) {
         if (this.browserMode === "adspower") {
-          await this._closeAdsPowerBrowser(browser);
+          await this._closeAdsPowerBrowser(browser, adsProfileId);
         } else {
           await browser.close();
         }
@@ -141,7 +172,7 @@ class RegisterService {
     try {
       // Try direct navigation first
       const success = await this._directNavigateToSignup(page);
-      
+
       // Check for suspension after navigation attempt
       if (this.browserMode === "adspower") {
         const currentUrl = page.url();
@@ -150,11 +181,11 @@ class RegisterService {
           await takeScreenshot(page, "account_suspended");
           throw {
             type: "SUSPENDED",
-            message: "Instagram account is suspended"
+            message: "Instagram account is suspended",
           };
         }
       }
-      
+
       if (success) {
         return true;
       }
@@ -162,7 +193,7 @@ class RegisterService {
       // If direct navigation fails, fall back to old method
       this.logger.info("Direct navigation failed, trying fallback method");
       const fallbackSuccess = await this._fallbackNavigateToSignup(page);
-      
+
       // Check for suspension after fallback attempt too
       if (this.browserMode === "adspower") {
         const currentUrl = page.url();
@@ -171,11 +202,11 @@ class RegisterService {
           await takeScreenshot(page, "account_suspended");
           throw {
             type: "SUSPENDED",
-            message: "Instagram account is suspended"
+            message: "Instagram account is suspended",
           };
         }
       }
-      
+
       return fallbackSuccess;
     } catch (error) {
       if (error.type === "SUSPENDED") {
@@ -183,10 +214,10 @@ class RegisterService {
           success: false,
           error: "ACCOUNT_SUSPENDED",
           status: "SUSPENDED",
-          message: error.message
+          message: error.message,
         };
       }
-      
+
       this.logger.error("All navigation attempts failed:", error.message);
       await takeScreenshot(page, "navigation_all_methods_failed");
       throw error;
@@ -562,8 +593,20 @@ class RegisterService {
       // Wait for navigation or success state
       await page.waitForLoadState("networkidle", { timeout: 30000 });
 
-      await takeScreenshot(page, "registration_complete");
+      // Check for suspension after verification
+      const currentUrl = page.url();
+      if (currentUrl.includes("/accounts/suspended")) {
+        this.logger.error("Account suspended detected after verification");
+        await takeScreenshot(page, "account_suspended_after_verification");
+        throw {
+          type: "SUSPENDED",
+          message: "Instagram account was suspended upon creation",
+        };
+      }
     } catch (error) {
+      if (error.type === "SUSPENDED") {
+        throw error; // Re-throw suspension error to be handled by register method
+      }
       this.logger.error("Verification code entry failed:", error);
       await takeScreenshot(page, "verification_error");
       throw error;
@@ -624,21 +667,91 @@ class RegisterService {
     return this.registrationAttempts.get(username);
   }
 
-  async _closeAdsPowerBrowser(browser) {
+  async _closeAdsPowerBrowser(browser, profileId) {
     try {
-      const userId = this.config.ADS_POWER_USER;
-      const closeUrl = `http://local.adspower.net:50325/api/v1/browser/stop?user_id=${userId}`;
+      if (!profileId) {
+        this.logger.warn('No profile ID provided for AdsPower browser closure');
+        return;
+      }
 
-      await fetch(closeUrl, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      this.logger.debug(`Closing AdsPower browser for profile: ${profileId}`);
 
-      await browser.close();
+      // Close the browser instance with retries
+      const maxRetries = 3;
+      let closeSuccess = false;
+
+      for (let i = 0; i < maxRetries && !closeSuccess; i++) {
+        try {
+          // First try to close the browser via Playwright
+          await browser.close().catch(err => 
+            this.logger.warn(`Failed to close browser via Playwright: ${err.message}`)
+          );
+
+          // Then stop the AdsPower browser
+          const closeUrl = `http://local.adspower.net:50325/api/v1/browser/stop?user_id=${profileId}`;
+          const closeResponse = await fetch(closeUrl);
+
+          if (!closeResponse.ok) {
+            throw new Error(`HTTP error! status: ${closeResponse.status}`);
+          }
+
+          const closeData = await closeResponse.json();
+          if (closeData.code === 0) {
+            closeSuccess = true;
+            this.logger.debug(`Successfully closed AdsPower browser for profile: ${profileId}`);
+          } else {
+            throw new Error(`AdsPower close failed with code ${closeData.code}: ${closeData.msg}`);
+          }
+        } catch (error) {
+          this.logger.warn(`Close attempt ${i + 1} failed: ${error.message}`);
+          if (i < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+          }
+        }
+      }
+
+      // Delete the profile with retries
+      let deleteSuccess = false;
+      for (let i = 0; i < maxRetries && !deleteSuccess; i++) {
+        try {
+          const deleteUrl = 'http://local.adspower.net:50325/api/v1/user/delete';
+          const deleteResponse = await fetch(deleteUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_ids: [profileId]
+            })
+          });
+
+          if (!deleteResponse.ok) {
+            throw new Error(`HTTP error! status: ${deleteResponse.status}`);
+          }
+
+          const deleteData = await deleteResponse.json();
+          if (deleteData.code === 0) {
+            deleteSuccess = true;
+            this.logger.debug(`Successfully deleted AdsPower profile: ${profileId}`);
+          } else {
+            throw new Error(`AdsPower delete failed with code ${deleteData.code}: ${deleteData.msg}`);
+          }
+        } catch (error) {
+          this.logger.warn(`Delete attempt ${i + 1} failed: ${error.message}`);
+          if (i < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // Exponential backoff
+          }
+        }
+      }
+
+      if (!closeSuccess) {
+        this.logger.error(`Failed to close AdsPower browser after ${maxRetries} attempts`);
+      }
+      if (!deleteSuccess) {
+        this.logger.error(`Failed to delete AdsPower profile after ${maxRetries} attempts`);
+      }
     } catch (error) {
-      this.logger.error("Failed to close AdsPower browser:", error);
+      this.logger.error('Failed to close AdsPower browser:', error);
     }
   }
 }
