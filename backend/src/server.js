@@ -5,6 +5,7 @@ const cors = require('cors');
 const container = require("./container");
 const cleanup = require("./utils/cleanup");
 const configureExpress = require("./config/express.config");
+const corsOptions = require("./api/v1/middleware/cors.middleware");
 
 /**
  * Server initialization and route setup
@@ -27,7 +28,7 @@ async function startServer() {
     const app = express();
 
     // Core middleware
-    app.use(cors());
+    app.use(cors(corsOptions));
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
     const logger = container.get("logger");

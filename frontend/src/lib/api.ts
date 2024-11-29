@@ -14,6 +14,7 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    withCredentials: true
 });
 
 
@@ -174,4 +175,43 @@ export const getMessageHistory = async (username: string): Promise<MessageHistor
             error: 'An unexpected error occurred'
         };
     }
+};
+
+interface RegisterResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    username: string;
+    email: string;
+    status: string;
+    timestamp: number;
+  };
+}
+
+// Add this new function with the other API functions
+export const registerUser = async (): Promise<RegisterResponse> => {
+  try {
+    const { data } = await api.post<RegisterResponse>('/v1/instagram/register', {}, {
+      withCredentials: true
+    });
+    return data;
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      // Handle authentication errors specifically
+      if (error.response?.status === 401) {
+        return {
+          success: false,
+          error: 'Please login to create an account',
+        };
+      }
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Registration failed',
+      };
+    }
+    return {
+      success: false,
+      error: 'An unexpected error occurred',
+    };
+  }
 };

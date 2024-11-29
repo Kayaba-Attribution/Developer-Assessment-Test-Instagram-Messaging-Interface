@@ -9,7 +9,8 @@ class InstagramController {
 
   async register(req, res) {
     try {
-      const result = await this.registerService.register();
+      const userId = req.user._id;
+      const result = await this.registerService.register(userId);
       res.status(result.success ? 200 : 400).json(result);
     } catch (error) {
       this.logger.error("Registration failed:", error);

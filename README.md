@@ -1,5 +1,20 @@
 #### Testing
 
+
+curl -X POST http://localhost:3000/api/v1/instagram/register \
+-H "Cookie: connect.sid=s:-ZD-knCh5OmpxCIv1XN2uykw4W_EwNtq.XXXX" \
+-H "Content-Type: application/json" \
+-d '{"username": "your_instagram_username", "password": "your_instagram_password"}'
+
+curl http://localhost:3000/api/v1/auth/user \
+-H "Cookie: connect.sid=s:-ZD-knCh5OmpxCIv1XN2uykw4W_EwNtq"
+
+curl -X POST http://localhost:3000/api/v1/instagram/register \
+-H "Cookie: connect.sid=s:-ZD-knCh5OmpxCIv1XN2uykw4W_EwNtq" \
+-H "Content-Type: application/json" \
+-d '{"username": "your_instagram_username", "password": "your_instagram_password"}'
+
+
 cat ~/.config/adspower_global/cwd_global/source/local_api/
 http://local.adspower.com:50325/status
 

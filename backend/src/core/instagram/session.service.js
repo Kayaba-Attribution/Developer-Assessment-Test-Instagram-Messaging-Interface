@@ -1,5 +1,6 @@
 // src/services/sessionService.js
 const bcrypt = require("bcrypt");
+const { ObjectId } = require("mongodb");
 
 // ! NEED TO MIGRATE MOST TO THE NEW MODEL
 
@@ -65,11 +66,11 @@ class SessionService {
   }
 
   // Core method: Create or update user session
-  async createOrUpdateSession(username, password, sessionData) {
+  async createOrUpdateSession(userId, username, password, sessionData) {
     try {
       const users = await this.getCollection();
 
-      // Extract only the essential cookies we need
+      // Extract session info from cookies
       const sessionInfo = {
         sessionId: sessionData.cookies.find((c) => c.name === "sessionid")
           ?.value,
@@ -77,30 +78,55 @@ class SessionService {
         csrfToken: sessionData.cookies.find((c) => c.name === "csrftoken")
           ?.value,
         rur: sessionData.cookies.find((c) => c.name === "rur")?.value,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hour expiration
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
       };
 
       const hashedPassword = await this.hashPassword(password);
 
-      // Update if exists, create if doesn't (upsert)
+      // Create Instagram account object
+      const instagramAccount = {
+        username: username,
+        password: hashedPassword,
+        session: sessionInfo,
+        lastActivity: new Date(),
+        messages: [], // Initialize empty message history
+      };
+
+      // Update user document with new Instagram account
       const result = await users.findOneAndUpdate(
-        { instagram_username: username },
-        {
-          $set: {
-            instagram_password: hashedPassword,
-            session: sessionInfo,
-            lastActivity: new Date(),
-          },
+        { 
+          _id: new ObjectId(userId),
+          "instagramAccounts.username": { $ne: username } // Prevent duplicates
         },
         {
-          upsert: true,
-          returnDocument: "after",
-        }
+          $push: { instagramAccounts: instagramAccount },
+          $set: { lastActivity: new Date() }
+        },
+        { returnDocument: "after" }
       );
 
-      return result.value;
+      if (!result.value) {
+        // If account already exists, update it
+        await users.updateOne(
+          { 
+            _id: new ObjectId(userId),
+            "instagramAccounts.username": username 
+          },
+          {
+            $set: {
+              "instagramAccounts.$": instagramAccount,
+              lastActivity: new Date()
+            }
+          }
+        );
+      }
+
+      this.logger.info(
+        `Session saved/updated for Instagram account: ${username} (User: ${userId})`
+      );
+      return instagramAccount;
     } catch (error) {
-      logger.error("Session update error:", error);
+      this.logger.error("Session update error:", error);
       throw error;
     }
   }
@@ -109,18 +135,28 @@ class SessionService {
   async getInstagramSession(username) {
     try {
       const users = await this.getCollection();
-      const user = await users.findOne({ instagram_username: username });
+      const user = await users.findOne({
+        "instagramAccounts.username": username,
+      });
 
-      if (!user?.session?.expiresAt) {
-        logger.debug(`No session found for ${username}`);
+      if (!user) {
+        this.logger.debug(`No user found with Instagram account ${username}`);
         return false;
       }
 
-      const isValid = new Date(user.session.expiresAt) > new Date();
-      logger.debug(`Session validation for ${username}: ${isValid}`);
+      const account = user.instagramAccounts.find(
+        (acc) => acc.username === username
+      );
+      if (!account?.session?.expiresAt) {
+        this.logger.debug(`No session found for ${username}`);
+        return false;
+      }
+
+      const isValid = new Date(account.session.expiresAt) > new Date();
+      this.logger.debug(`Session validation for ${username}: ${isValid}`);
       return isValid;
     } catch (error) {
-      logger.error("Session validation error:", error);
+      this.logger.error("Session validation error:", error);
       return false;
     }
   }
@@ -128,27 +164,34 @@ class SessionService {
   async getStoredCredentials(username) {
     try {
       const users = await this.getCollection();
-      const user = await users.findOne(
-        { instagram_username: username },
-        { projection: { session: 1 } }
-      );
+      const user = await users.findOne({
+        "instagramAccounts.username": username,
+      });
 
-      if (!user?.session) {
-        logger.debug(`No credentials found for ${username}`);
+      if (!user) {
+        this.logger.debug(`No user found with Instagram account ${username}`);
         return null;
       }
 
-      const isValid = new Date(user.session.expiresAt) > new Date();
+      const account = user.instagramAccounts.find(
+        (acc) => acc.username === username
+      );
+      if (!account?.session) {
+        this.logger.debug(`No credentials found for ${username}`);
+        return null;
+      }
+
+      const isValid = new Date(account.session.expiresAt) > new Date();
       if (!isValid) {
-        logger.debug(`Expired session found for ${username}`);
+        this.logger.debug(`Expired session found for ${username}`);
         return null;
       }
 
       return {
-        session: user.session,
+        session: account.session,
       };
     } catch (error) {
-      logger.error("Error getting stored credentials:", error);
+      this.logger.error("Error getting stored credentials:", error);
       return null;
     }
   }
@@ -156,8 +199,6 @@ class SessionService {
   async logMessage(fromUsername, recipient, content, status, error = null) {
     try {
       const users = await this.getCollection();
-
-      // Create the message object
       const messageLog = {
         recipient,
         content,
@@ -166,23 +207,27 @@ class SessionService {
         ...(error && { error: error.toString() }),
       };
 
-      // Update the document using MongoDB's $push operator
       const result = await users.updateOne(
-        { instagram_username: fromUsername },
+        { "instagramAccounts.username": fromUsername },
         {
-          $push: { messages: messageLog },
-          $set: { lastActivity: new Date() },
+          $push: { "instagramAccounts.$.messages": messageLog },
+          $set: {
+            "instagramAccounts.$.lastActivity": new Date(),
+            lastActivity: new Date(),
+          },
         }
       );
 
       if (result.matchedCount === 0) {
-        throw new Error("User not found");
+        throw new Error("Instagram account not found");
       }
 
-      logger.info(`Message logged for user ${fromUsername} to ${recipient}`);
+      this.logger.info(
+        `Message logged for Instagram account ${fromUsername} to ${recipient}`
+      );
       return messageLog;
     } catch (error) {
-      logger.error("Error logging message:", error);
+      this.logger.error("Error logging message:", error);
       throw error;
     }
   }

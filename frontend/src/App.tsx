@@ -12,6 +12,7 @@ import { MessageForm } from "./components/MessageForm";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Navbar } from "./components/Navbar";
+import { AccountCreation } from "./components/AccountCreation";
 
 export function App() {
   return (
@@ -29,6 +30,7 @@ export function App() {
                   <Routes>
                     <Route path="/messages" element={<MessageForm />} />
                     <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/create-account" element={<AccountCreation />} />
                     <Route
                       path="/"
                       element={<Navigate to="/messages" replace />}

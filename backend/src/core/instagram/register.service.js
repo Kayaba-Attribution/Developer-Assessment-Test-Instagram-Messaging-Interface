@@ -39,7 +39,7 @@ class RegisterService {
     this.browserMode = config.BROWSER_MODE || "default";
   }
 
-  async register() {
+  async register(userId) {
     let browser, page, proxy;
 
     try {
@@ -94,14 +94,33 @@ class RegisterService {
 
       await page.waitForTimeout(50000);
 
-      const sessionState = await browser.contexts()[0].storageState();
-      const session = await this.sessionService.createInstagramSession({
-        username: registrationData.username,
-        sessionData: sessionState,
-        proxy: this.browserMode === "default" ? proxy?.server : null,
-      });
+      const context = browser.contexts()[0];
+      const cookies = await context.cookies();
+      const sessionState = {
+        cookies,
+        userId: registrationData.username, // Using username as userId for new accounts
+      };
 
-      return { success: true, data: { ...registrationData, session } };
+      // Create or update session with the new account
+      const session = await this.sessionService.createOrUpdateSession(
+        userId,
+        registrationData.username,
+        registrationData.password,
+        sessionState
+      );
+
+      this.logger.info(
+        `Session saved for new account ${registrationData.username}`
+      );
+
+      return {
+        success: true,
+        data: {
+          ...registrationData,
+          session,
+          proxy: this.browserMode === "default" ? proxy?.server : null,
+        },
+      };
     } catch (error) {
       this.logger.error("Registration failed:", error);
       return { success: false, error: error.message };
