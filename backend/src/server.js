@@ -72,6 +72,7 @@ function mountRoutes(app) {
     "/api/v1/instagram",
     require("./api/v1/routes/instagram.routes")({
       instagramController: container.get("instagramController"),
+      registrationStatusController: container.get("registrationStatusController")
     })
   );
 }

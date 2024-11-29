@@ -1,4 +1,6 @@
 // src/api/v1/controllers/instagram.controller.js
+const crypto = require("crypto");
+
 class InstagramController {
   constructor({ loginService, registerService, messageService, logger }) {
     this.loginService = loginService;
@@ -10,11 +12,22 @@ class InstagramController {
   async register(req, res) {
     try {
       const userId = req.user._id;
-      const result = await this.registerService.register(userId);
-      res.status(result.success ? 200 : 400).json(result);
+      const registrationId = crypto.randomBytes(16).toString('hex');
+      
+      // Start the registration process asynchronously
+      this.registerService.register(userId, registrationId).catch(error => {
+        this.logger.error("Registration failed:", error);
+      });
+      
+      // Return immediately with the registrationId
+      res.status(202).json({
+        success: true,
+        registrationId,
+        message: 'Registration process started'
+      });
     } catch (error) {
-      this.logger.error("Registration failed:", error);
-      res.status(500).json({ success: false, error: "Registration failed" });
+      this.logger.error("Failed to start registration:", error);
+      res.status(500).json({ success: false, error: "Failed to start registration" });
     }
   }
 

@@ -63,3 +63,26 @@ export interface SessionResponse {
     error?: string;
     message?: string;
 }
+
+export interface RegistrationStatus {
+    status: 'INITIALIZED' | 'PROFILE_CREATED' | 'BROWSER_LAUNCHED' | 'FORM_FILLING' | 'AWAITING_VERIFICATION' | 'VERIFICATION_SUBMITTED' | 'COMPLETED' | 'FAILED';
+    timestamp: number;
+    details: {
+        username?: string;
+        error?: string;
+        [key: string]: any;
+    };
+}
+
+export interface RegistrationResponse {
+    success: boolean;
+    registrationId: string;
+    message?: string;
+    error?: string;
+}
+
+export interface RegistrationStatusResponse {
+    success: boolean;
+    data?: RegistrationStatus;
+    error?: string;
+}

@@ -1,6 +1,7 @@
 // src/services/register.service.js
 const crypto = require("crypto");
 const { takeScreenshot } = require("../../utils/files");
+const { REGISTRATION_STATUS } = require("./registration.status");
 
 class RegisterService {
   constructor(
@@ -9,7 +10,8 @@ class RegisterService {
     sessionService,
     emailService,
     logger,
-    config
+    config,
+    statusTracker
   ) {
     this.browserService = browserService;
     this.proxyService = proxyService;
@@ -17,6 +19,7 @@ class RegisterService {
     this.emailService = emailService;
     this.logger = logger;
     this.config = config;
+    this.statusTracker = statusTracker;
 
     this.registrationAttempts = new Map();
     this.formSelectors = {
@@ -39,27 +42,28 @@ class RegisterService {
     this.browserMode = config.BROWSER_MODE || "default";
   }
 
-  async register(userId) {
+  async register(userId, registrationId) {
+    await this.statusTracker.updateStatus(registrationId, REGISTRATION_STATUS.INITIALIZED);
+    
     let browser, page, proxy, adsProfileId;
 
     try {
-      proxy =
-        this.browserMode === "default"
-          ? await this.proxyService.getWorkingProxy()
-          : null;
-
+      proxy = this.browserMode === "default" ? await this.proxyService.getWorkingProxy() : null;
       const registrationData = this._prepareRegistrationData();
 
-      const { browser: newBrowser, page: newPage, userId: newUserId } =
-        await this.browserService.createPageWithMode(
-          this.browserMode,
-          null,
-          proxy
-        );
+      // Update status before profile creation
+      await this.statusTracker.updateStatus(registrationId, REGISTRATION_STATUS.PROFILE_CREATED, {
+        username: registrationData.username
+      });
+
+      const { browser: newBrowser, page: newPage, userId: newUserId } = 
+        await this.browserService.createPageWithMode(this.browserMode, null, proxy);
 
       browser = newBrowser;
       page = newPage;
       adsProfileId = newUserId;
+
+      await this.statusTracker.updateStatus(registrationId, REGISTRATION_STATUS.BROWSER_LAUNCHED);
 
       const navigationResult = await this._navigateToSignup(page);
 
@@ -71,24 +75,11 @@ class RegisterService {
         return navigationResult;
       }
 
+      await this.statusTracker.updateStatus(registrationId, REGISTRATION_STATUS.FORM_FILLING);
       await this._fillRegistrationForm(page, registrationData);
 
-      registrationData.status = "FORM_FILLED";
-      this.registrationAttempts.set(
-        registrationData.username,
-        registrationData
-      );
-
-      this.logger.debug(
-        "Registration form filled, waiting for verification code"
-      );
-
-      // ? Wait for mail service to get the email
-      await page.waitForTimeout(6000);
-
-      const verificationCode = await this._getVerificationCode(
-        registrationData.emailHash
-      );
+      await this.statusTracker.updateStatus(registrationId, REGISTRATION_STATUS.AWAITING_VERIFICATION);
+      const verificationCode = await this._getVerificationCode(registrationData.emailHash);
 
       if (!verificationCode) {
         throw new Error("Verification code not found");
@@ -144,8 +135,14 @@ class RegisterService {
         }
       }
 
+      await this.statusTracker.updateStatus(registrationId, REGISTRATION_STATUS.COMPLETED, {
+        username: registrationData.username,
+        success: true
+      });
+
       return {
         success: true,
+        registrationId,
         data: {
           ...registrationData,
           session,
@@ -153,8 +150,10 @@ class RegisterService {
         },
       };
     } catch (error) {
-      this.logger.error("Registration failed:", error);
-      return { success: false, error: error.message };
+      await this.statusTracker.updateStatus(registrationId, REGISTRATION_STATUS.FAILED, {
+        error: error.message
+      });
+      return { success: false, registrationId, error: error.message };
     } finally {
       if (browser) {
         if (this.browserMode === "adspower") {

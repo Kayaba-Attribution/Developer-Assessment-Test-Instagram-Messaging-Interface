@@ -15,6 +15,9 @@ const {
   InstagramController,
 } = require("./api/v1/controllers/instagram.controller");
 const MessageService = require("./core/instagram/message.service");
+const Redis = require('ioredis');
+const { RegistrationStatusTracker } = require('./core/instagram/registration.status');
+const RegistrationStatusController = require('./api/v1/controllers/registration-status.controller');
 
 
 class Container {
@@ -23,6 +26,9 @@ class Container {
   }
 
   register(name, instance) {
+    if(!instance) {
+      throw new Error(`Instance for ${name} not found`);
+    }
     this.services.set(name, instance);
   }
 
@@ -34,6 +40,8 @@ class Container {
   }
 
   async cleanup() {
+    const redis = this.get('redis');
+    await redis.quit();
     const db = this.get("db");
     await db.disconnect();
   }
@@ -75,13 +83,27 @@ class Container {
       QUERIES
     );
 
+    // Initialize Redis
+    const redis = new Redis({
+      host: config.REDIS_HOST || 'localhost',
+      port: config.REDIS_PORT || 6379,
+      db: config.REDIS_DB || 0
+    });
+
+    this.register('redis', redis);
+
+    // Initialize status tracker
+    const statusTracker = new RegistrationStatusTracker(redis);
+    this.register('statusTracker', statusTracker);
+
     const registerService = new RegisterService(
       browserService,
       proxyService,
       sessionService,
       mailService,
       logger,
-      config
+      config,
+      statusTracker
     );
 
     this.register("loginService", loginService);
@@ -106,6 +128,13 @@ class Container {
     });
 
     this.register("instagramController", instagramController);
+
+    // Add RegistrationStatusController
+    const registrationStatusController = new RegistrationStatusController(
+      statusTracker,
+      logger
+    );
+    this.register('registrationStatusController', registrationStatusController);
 
     logger.info("Container initialized");
   }

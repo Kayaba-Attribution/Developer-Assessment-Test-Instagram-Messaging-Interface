@@ -177,36 +177,42 @@ export const getMessageHistory = async (username: string): Promise<MessageHistor
     }
 };
 
-interface RegisterResponse {
-  success: boolean;
-  error?: string;
-  data?: {
-    username: string;
-    email: string;
-    status: string;
-    timestamp: number;
-  };
-}
-
-// Add this new function with the other API functions
-export const registerUser = async (): Promise<RegisterResponse> => {
+export const registerUser = async (): Promise<RegistrationResponse> => {
   try {
-    const { data } = await api.post<RegisterResponse>('/v1/instagram/register', {}, {
-      withCredentials: true
-    });
+    const { data } = await api.post<RegistrationResponse>('/v1/instagram/register');
     return data;
   } catch (error) {
     if (error instanceof AxiosError) {
-      // Handle authentication errors specifically
       if (error.response?.status === 401) {
         return {
           success: false,
+          registrationId: '',
           error: 'Please login to create an account',
         };
       }
       return {
         success: false,
+        registrationId: '',
         error: error.response?.data?.error || 'Registration failed',
+      };
+    }
+    return {
+      success: false,
+      registrationId: '',
+      error: 'An unexpected error occurred',
+    };
+  }
+};
+
+export const getRegistrationStatus = async (registrationId: string): Promise<RegistrationStatusResponse> => {
+  try {
+    const { data } = await api.get<RegistrationStatusResponse>(`/v1/instagram/registration/${registrationId}/status`);
+    return data;
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch status',
       };
     }
     return {
