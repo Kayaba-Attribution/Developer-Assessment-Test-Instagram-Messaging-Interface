@@ -1,23 +1,14 @@
 #### Testing
 
+username creation file:
 
-curl -X POST http://localhost:3000/api/v1/instagram/register \
--H "Cookie: connect.sid=s:-ZD-knCh5OmpxCIv1XN2uykw4W_EwNtq.XXXX" \
--H "Content-Type: application/json" \
--d '{"username": "your_instagram_username", "password": "your_instagram_password"}'
+backend/src/core/mail/temp-mail.service.js
 
-curl http://localhost:3000/api/v1/auth/user \
--H "Cookie: connect.sid=s:-ZD-knCh5OmpxCIv1XN2uykw4W_EwNtq"
-
-curl -X POST http://localhost:3000/api/v1/instagram/register \
--H "Cookie: connect.sid=s:-ZD-knCh5OmpxCIv1XN2uykw4W_EwNtq" \
--H "Content-Type: application/json" \
--d '{"username": "your_instagram_username", "password": "your_instagram_password"}'
-
-
+**429 error**
 cat ~/.config/adspower_global/cwd_global/source/local_api/
 http://local.adspower.com:50325/status
 
+```
 {
     "message": "feedback_required",
     "spam": true,
@@ -29,6 +20,9 @@ http://local.adspower.com:50325/status
     "feedback_action": "report_problem",
     "status": "fail"
 }
+```
+
+> no longer accesible via CLI must use front-end
 
 **Full creation sequence:**
 `curl -X POST http://localhost:3000/api/v1/instagram/register  `
@@ -50,62 +44,22 @@ Do not launch multiple accounts on the same device, as this increases the risk o
 Anti-detect Browser
 If you plan to use accounts manually, don’t log in to accounts from regular browsers such as Brave, Opera, Firefox, Chrome, etc. Use anti-detect browsers like Multilogin, AdsPower, or similar tools. For Telegram accounts, you must purchase specific software, as regular browsers do not work with them.
 
-info: Filling form with data: {
-  "email": "manish.winhold.b2f819af@tgvis.com",
-  "emailHash": "7d34dcac2824ea43235ccc884fbeae13",
-  "username": "manish.winhold.b2f819af_9445",
-  "fullName": "nthenya karen",
-  "password": "d69dd05a5c541b2f!1A",
-  "birthday": {
-    "year": 1992,
-    "month": 3,
-    "day":
 
-`npm run findProxies`  
-
-```js
-Found proxies: [
-  { server: 'http://185.206.71.91:9090', type: 'http', isKnown: false },
-  { server: 'http://47.238.128.246:100', type: 'http', isKnown: false },
-  { server: 'http://8.219.97.248:80', type: 'http', isKnown: false },
-  { server: 'http://204.57.112.5:80', type: 'http', isKnown: false },
-  { server: 'http://47.119.164.33:8080', type: 'http', isKnown: false },
-  { server: 'http://8.221.139.222:8008', type: 'http', isKnown: false },
-  { server: 'http://44.195.247.145:80', type: 'http', isKnown: false },
-  { server: 'http://39.102.208.23:8081', type: 'http', isKnown: false },
-  { server: 'http://157.254.53.50:80', type: 'http', isKnown: false },
-  { server: 'http://8.220.205.172:9098', type: 'http', isKnown: false }
-]
-```
 
 ### Blocker:
-+ Accounts are being suspended upon creation
++ [X] Accounts are being suspended upon creation
   + implemented proxies and rotation
   + make changes to the interactions
   + ip? -> might be blacklisted
     + look into ip rotation
-  + maybe is the email domain?
-
-_if more than half a day -> manually create and move to interactions_
-
+  **Solved by AdPower Browser**
++ 429
+  + proxies do not work
+  + wait time? one account per proxy?
 
 ## Changes, plan, status, notes:
 
-+ modify data schema
-  - [ ] user -> many accounts -> session & many-msgs
-
-+ create instagram account
-  - AgentQL routes ig
-  - [x] email creation service
-  - [x] verification code handling
-  - [ ] account creation UI
-    - [ ] x numbers of accounts
-    - [ ] call API route to perform tasks bulk (realtime updates -> later)
   - perform login on all accounts and save credentials
-
-  + account management 
-  - status API 
-  - select owned accounts
   + Comments
     + input text
     + OpenAI call
@@ -141,7 +95,22 @@ _if more than half a day -> manually create and move to interactions_
     - [X] extract code from temp email
     - [X] input code and wait
 
-  - [ ] save credentials
++ create instagram account
+  - AgentQL routes ig
+  - [x] email creation service
+  - [x] verification code handling
+  - [X] account creation UI
+    - [X] x numbers of accounts
+    - [X] call API route to perform tasks bulk (realtime updates -> later)
+  - [X] save credentials
+
+    + account management 
+  - [X] status API 
+  - [X] select owned accounts
+
+  + modify data schema
+  - [X] user -> many accounts -> session & many-msgs
+
 
 
 **using [Temp-mail API](https://temp-mail.org/en/api)**
@@ -306,6 +275,23 @@ Components:
 - Support for follow/unfollow, post liking, and direct messaging.
 
 
+`npm run findProxies`  
+
+```js
+Found proxies: [
+  { server: 'http://185.206.71.91:9090', type: 'http', isKnown: false },
+  { server: 'http://47.238.128.246:100', type: 'http', isKnown: false },
+  { server: 'http://8.219.97.248:80', type: 'http', isKnown: false },
+  { server: 'http://204.57.112.5:80', type: 'http', isKnown: false },
+  { server: 'http://47.119.164.33:8080', type: 'http', isKnown: false },
+  { server: 'http://8.221.139.222:8008', type: 'http', isKnown: false },
+  { server: 'http://44.195.247.145:80', type: 'http', isKnown: false },
+  { server: 'http://39.102.208.23:8081', type: 'http', isKnown: false },
+  { server: 'http://157.254.53.50:80', type: 'http', isKnown: false },
+  { server: 'http://8.220.205.172:9098', type: 'http', isKnown: false }
+]
+```
+
 
 ### idea for check and AgentQL Integration
 ```mermaid
@@ -350,3 +336,50 @@ stateDiagram-v2
     end note
 ```
 
+
+### Technical Architecture
+
+#### Backend Components
+
+1. **Container Management**
+   - Uses AdsPower browser containers for isolated Instagram sessions
+   - Each account runs in a separate container to prevent fingerprinting
+   - Container lifecycle managed through AdsPower's local API (port 50325)
+
+2. **Service Layer**
+   - Instagram Service: Handles account creation, login, and actions
+   - Mail Service: Manages temporary email generation and verification codes
+   - Browser Service: Controls AdsPower browser instances and sessions
+   - Proxy Service: Manages proxy rotation and validation
+
+3. **Browser Automation**
+   - AgentQL for reliable element selection and interaction
+   - Automated workflows for account creation and actions
+   - Built-in delays and randomization to avoid detection
+
+4. **Configuration**
+   - Environment-based config for services
+   - Proxy settings and rotation rules
+   - Rate limiting and delay settings
+   - Browser profiles and fingerprinting settings
+
+5. **Data Persistence**
+   - Account credentials and session data
+   - Container IDs and browser profiles
+   - Action logs and status tracking
+   - Proxy lists and performance metrics
+
+#### Key Integration Points
+
+- AdsPower Local API: `http://local.adspower.com:50325`
+- Temp Mail API for email verification
+- OpenAI API for comment generation
+- Proxy validation endpoints
+
+#### Security Measures
+
+- One account per container policy
+- Proxy rotation for IP diversity
+- Fingerprint spoofing via AdsPower
+- Rate limiting and action delays
+- Encrypted credential storage
