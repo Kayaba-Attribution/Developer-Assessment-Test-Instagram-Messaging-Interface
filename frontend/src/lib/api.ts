@@ -7,6 +7,7 @@ import {
     MessageResponse,
     SessionResponse,
     Message,
+    InstagramAccountsResponse,
 } from './types';
 
 const api = axios.create({
@@ -213,6 +214,24 @@ export const getRegistrationStatus = async (registrationId: string): Promise<Reg
       return {
         success: false,
         error: error.response?.data?.error || 'Failed to fetch status',
+      };
+    }
+    return {
+      success: false,
+      error: 'An unexpected error occurred',
+    };
+  }
+};
+
+export const getInstagramAccounts = async (): Promise<InstagramAccountsResponse> => {
+  try {
+    const { data } = await api.get<InstagramAccountsResponse>('/v1/instagram/accounts');
+    return data;
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch Instagram accounts',
       };
     }
     return {

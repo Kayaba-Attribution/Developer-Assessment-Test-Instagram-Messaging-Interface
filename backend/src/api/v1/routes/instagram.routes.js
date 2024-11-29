@@ -26,5 +26,11 @@ module.exports = ({ instagramController, registrationStatusController }) => {
     registrationStatusController.getStatus.bind(registrationStatusController)
   );
 
+  // Add new route to get user's Instagram accounts
+  router.get(
+    "/accounts",
+    instagramController.getAccounts.bind(instagramController)
+  );
+
   return router;
 };

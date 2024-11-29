@@ -17,16 +17,16 @@ class BrowserService {
   }
 
   async createPageWithMode(mode = "default", sessionData = null, proxy = null) {
-    // mode: default, no-proxy, adspower
-    // sessionData: null,
-    // proxy: null
+    // mode: default, no-proxy, adspower, brightdata
     this.logger.info(`Creating page with mode: ${mode}`);
 
     switch (mode) {
       case "no-proxy":
         return this.createPageNoProxy(sessionData);
       case "adspower":
-        return this.createPageAdsPower(sessionData, proxy);
+        return this.createPageAdsPower(sessionData, true);
+      case "brightdata":
+        return this.createPageBrightdata(sessionData);
       case "default":
       default:
         return this.createPage(sessionData, proxy);
@@ -386,6 +386,145 @@ class BrowserService {
     await this.simulateHumanBehavior(page);
 
     return { browser, page, fingerprint };
+  }
+
+  async createPageBrightdata(sessionData = null) {
+    try {
+      // Validate configuration first
+      this.validateBrightdataConfig();
+      
+      this.logger.info("[BrowserService] Attempting to connect to Brightdata browser", {
+        wsEndpoint: this.config.BRIGHTDATA_CONFIG?.wsEndpoint
+      });
+
+      // Add connection timeout
+      const connectPromise = chromium.connectOverCDP(this.config.BRIGHTDATA_CONFIG.wsEndpoint);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Connection timeout after 30 seconds")), 30000);
+      });
+
+      const browser = await Promise.race([connectPromise, timeoutPromise])
+        .catch(error => {
+          this.logger.error("[BrowserService] Brightdata connection failed:", {
+            error: error.message,
+            stack: error.stack
+          });
+          throw new Error(`Failed to connect to Brightdata: ${error.message}`);
+        });
+
+      this.logger.info("[BrowserService] Connected to Brightdata browser, creating context");
+
+      // Create browser context with more detailed error handling
+      let context;
+      try {
+        context = await browser.newContext({
+          userAgent: this.browserConfig.USER_AGENTS[
+            Math.floor(Math.random() * this.browserConfig.USER_AGENTS.length)
+          ],
+          viewport: {
+            width: this.browserConfig.BROWSER_WIDTH,
+            height: this.browserConfig.BROWSER_HEIGHT
+          },
+          ...(sessionData && { storageState: sessionData }),
+          // Add additional options to help with detection
+          ignoreHTTPSErrors: true,
+          bypassCSP: true,
+          extraHTTPHeaders: {
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'sec-ch-ua': '"Google Chrome";v="119"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"'
+          }
+        });
+      } catch (error) {
+        this.logger.error("[BrowserService] Failed to create browser context:", {
+          error: error.message,
+          stack: error.stack
+        });
+        await browser.close().catch(e => this.logger.error("Failed to close browser after context creation error:", e));
+        throw error;
+      }
+
+      this.logger.info("[BrowserService] Browser context created, creating new page");
+
+      // Create page with error handling
+      let page;
+      try {
+        page = await wrap(await context.newPage());
+      } catch (error) {
+        this.logger.error("[BrowserService] Failed to create new page:", {
+          error: error.message,
+          stack: error.stack
+        });
+        await context.close().catch(e => this.logger.error("Failed to close context after page creation error:", e));
+        await browser.close().catch(e => this.logger.error("Failed to close browser after page creation error:", e));
+        throw error;
+      }
+
+      // Test the connection with a simple navigation
+      try {
+        this.logger.info("[BrowserService] Testing Brightdata connection");
+        await page.goto('https://api.ipify.org?format=json', {
+          waitUntil: 'networkidle',
+          timeout: 30000
+        });
+        
+        const ipInfo = await this.verifyProxy(page);
+        if (!ipInfo) {
+          throw new Error("Failed to verify Brightdata connection");
+        }
+        
+        this.logger.info("[BrowserService] Brightdata connection test successful", { ipInfo });
+      } catch (error) {
+        this.logger.error("[BrowserService] Brightdata connection test failed:", {
+          error: error.message,
+          stack: error.stack
+        });
+        await page.close().catch(e => this.logger.error("Failed to close page after connection test error:", e));
+        await context.close().catch(e => this.logger.error("Failed to close context after connection test error:", e));
+        await browser.close().catch(e => this.logger.error("Failed to close browser after connection test error:", e));
+        throw error;
+      }
+
+      await this.simulateHumanBehavior(page);
+
+      return { browser, page };
+    } catch (error) {
+      this.logger.error("[BrowserService] Brightdata browser creation failed:", {
+        error: error.message,
+        stack: error.stack,
+        config: {
+          ...this.config.BRIGHTDATA_CONFIG,
+          wsEndpoint: '[REDACTED]' // Don't log credentials
+        }
+      });
+      throw new Error(`Failed to create Brightdata browser: ${error.message}`);
+    }
+  }
+
+  validateBrightdataConfig() {
+    const config = this.config.BRIGHTDATA_CONFIG;
+    
+    if (!config) {
+      throw new Error("Brightdata configuration is missing");
+    }
+
+    if (!config.wsEndpoint) {
+      throw new Error("Brightdata websocket endpoint is missing");
+    }
+
+    if (!config.wsEndpoint.startsWith('wss://')) {
+      throw new Error("Invalid Brightdata websocket endpoint format");
+    }
+
+    // Basic format validation for the endpoint
+    const wsRegex = /^wss:\/\/brd-customer-[^:]+:[^@]+@brd\.superproxy\.io:\d+$/;
+    if (!wsRegex.test(config.wsEndpoint)) {
+      throw new Error("Invalid Brightdata websocket endpoint format");
+    }
+
+    return true;
   }
 }
 

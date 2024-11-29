@@ -1,7 +1,7 @@
 // src/services/register.service.js
 const crypto = require("crypto");
 const { takeScreenshot } = require("../../utils/files");
-const { REGISTRATION_STATUS } = require("./registration.status");
+const { REGISTRATION_STATUS } = require("../status/registration.status");
 
 class RegisterService {
   constructor(

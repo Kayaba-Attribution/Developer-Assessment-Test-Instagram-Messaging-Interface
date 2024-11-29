@@ -9,7 +9,11 @@ const isDev = NODE_ENV === "development";
 const config = {
   development: {
     FAST_MODE: true,
-    BROWSER_MODE: "adspower", // 'adspower' or 'default' or 'no-proxy'
+    BROWSER_MODE: "brightdata", 
+    // 'adspower'
+    // 'default'
+    //'no-proxy'
+    // brightdata
     ADS_POWER_USER: "kqhbqo5",
     OXYLABS_PROXY: {
       server: "http://pr.oxylabs.io:7777",
@@ -45,6 +49,9 @@ const config = {
       maxSize: "20m",
       maxFiles: 5,
     },
+    BRIGHTDATA_CONFIG: {
+      wsEndpoint: "wss://brd-customer-hl_17de491b-zone-scraping_browser1:ss2fhm65x9v0@brd.superproxy.io:9222"
+    },
   },
   production: {
     BROWSER_MODE: "default",
@@ -67,6 +74,9 @@ const config = {
     logRetention: {
       maxSize: "50m",
       maxFiles: 10,
+    },
+    BRIGHTDATA_CONFIG: {
+      wsEndpoint: "wss://brd-customer-hl_17de491b-zone-scraping_browser1:ss2fhm65x9v0@brd.superproxy.io:9222"
     },
   },
 }[NODE_ENV];

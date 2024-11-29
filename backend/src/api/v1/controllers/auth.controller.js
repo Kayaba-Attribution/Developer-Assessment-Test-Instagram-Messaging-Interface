@@ -15,7 +15,15 @@ class AuthController {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ user: null });
     }
-    res.json({ user: req.user });
+    
+    // Sanitize user object to only return necessary fields
+    const sanitizedUser = {
+      _id: req.user._id,
+      email: req.user.email,
+      name: req.user.name
+    };
+    
+    res.json({ user: sanitizedUser });
   }
 }
 

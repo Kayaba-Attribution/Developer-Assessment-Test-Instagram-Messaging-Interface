@@ -2,10 +2,11 @@
 const crypto = require("crypto");
 
 class InstagramController {
-  constructor({ loginService, registerService, messageService, logger }) {
+  constructor({ loginService, registerService, messageService, sessionService, logger }) {
     this.loginService = loginService;
     this.registerService = registerService;
     this.messageService = messageService;
+    this.sessionService = sessionService;
     this.logger = logger;
   }
 
@@ -59,6 +60,31 @@ class InstagramController {
     } catch (error) {
       this.logger.error("Status check failed:", error);
       res.status(500).json({ success: false, error: "Status check failed" });
+    }
+  }
+
+  async getAccounts(req, res) {
+    try {
+      const userId = req.user._id;
+      const accounts = await this.sessionService.getInstagramAccounts(userId);
+      
+      // Map to return only necessary information
+      const sanitizedAccounts = accounts.map(account => ({
+        username: account.username,
+        lastActivity: account.lastActivity,
+        isSessionValid: account.session ? new Date(account.session.expiresAt) > new Date() : false
+      }));
+
+      res.json({ 
+        success: true, 
+        data: sanitizedAccounts 
+      });
+    } catch (error) {
+      this.logger.error("Failed to fetch Instagram accounts:", error);
+      res.status(500).json({ 
+        success: false, 
+        error: "Failed to fetch Instagram accounts" 
+      });
     }
   }
 }

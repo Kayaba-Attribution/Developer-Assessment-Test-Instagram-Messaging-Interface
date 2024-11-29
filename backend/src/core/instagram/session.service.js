@@ -263,6 +263,22 @@ class SessionService {
       return [];
     }
   }
+
+  async getInstagramAccounts(userId) {
+    try {
+      const users = await this.getCollection();
+      const user = await users.findOne({ _id: new ObjectId(userId) });
+
+      if (!user || !user.instagramAccounts) {
+        return [];
+      }
+
+      return user.instagramAccounts;
+    } catch (error) {
+      this.logger.error("Error fetching Instagram accounts:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = SessionService;

@@ -86,3 +86,15 @@ export interface RegistrationStatusResponse {
     data?: RegistrationStatus;
     error?: string;
 }
+
+export interface InstagramAccount {
+    username: string;
+    lastActivity: string;
+    isSessionValid: boolean;
+}
+
+export interface InstagramAccountsResponse {
+    success: boolean;
+    data?: InstagramAccount[];
+    error?: string;
+}

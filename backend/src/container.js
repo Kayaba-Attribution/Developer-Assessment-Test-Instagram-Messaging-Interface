@@ -16,7 +16,9 @@ const {
 } = require("./api/v1/controllers/instagram.controller");
 const MessageService = require("./core/instagram/message.service");
 const Redis = require('ioredis');
-const { RegistrationStatusTracker } = require('./core/instagram/registration.status');
+const {
+  RegistrationStatusTracker,
+} = require("./core/status/registration.status");
 const RegistrationStatusController = require('./api/v1/controllers/registration-status.controller');
 
 
@@ -124,6 +126,7 @@ class Container {
       loginService,
       registerService,
       messageService,
+      sessionService,
       logger,
     });
 
