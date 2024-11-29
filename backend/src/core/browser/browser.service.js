@@ -17,16 +17,18 @@ class BrowserService {
   }
 
   async createPageWithMode(mode = "default", sessionData = null, proxy = null) {
-    // mode: default, no-proxy, adspower, brightdata
+    // mode: default, no-proxy, adspower, brightdata, iproyal
     this.logger.info(`Creating page with mode: ${mode}`);
 
     switch (mode) {
       case "no-proxy":
         return this.createPageNoProxy(sessionData);
       case "adspower":
-        return this.createPageAdsPower(sessionData, true);
+        return this.createPageAdsPower(sessionData, false);
       case "brightdata":
         return this.createPageBrightdata(sessionData);
+      case "iproyal":
+        return this.createPageIpRoyal(sessionData);
       case "default":
       default:
         return this.createPage(sessionData, proxy);
@@ -388,144 +390,126 @@ class BrowserService {
     return { browser, page, fingerprint };
   }
 
-  async createPageBrightdata(sessionData = null) {
+  async createPageIpRoyal(sessionData = null) {
     try {
-      // Validate configuration first
-      this.validateBrightdataConfig();
+      const fingerprint = this.generateFingerprint();
       
-      this.logger.info("[BrowserService] Attempting to connect to Brightdata browser", {
-        wsEndpoint: this.config.BRIGHTDATA_CONFIG?.wsEndpoint
+      this.logger.info("[BrowserService] Creating IP Royal browser");
+
+      // Format proxy string - Fix the proxy URL format
+      const proxyConfig = this.config.IPROYAL_PROXY;
+      
+      this.logger.info("[BrowserService] Using IP Royal proxy:", {
+        server: proxyConfig.server,
+        username: proxyConfig.username
       });
 
-      // Add connection timeout
-      const connectPromise = chromium.connectOverCDP(this.config.BRIGHTDATA_CONFIG.wsEndpoint);
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Connection timeout after 30 seconds")), 30000);
+      const browser = await chromium.launch({
+        headless: this.config.headless,
+        args: [
+          ...this.browserConfig.BROWSER_ARGS,
+        ],
+        ignoreDefaultArgs: this.browserConfig.IGNORED_ARGS,
       });
 
-      const browser = await Promise.race([connectPromise, timeoutPromise])
-        .catch(error => {
-          this.logger.error("[BrowserService] Brightdata connection failed:", {
-            error: error.message,
-            stack: error.stack
-          });
-          throw new Error(`Failed to connect to Brightdata: ${error.message}`);
-        });
+      const context = await browser.newContext({
+        userAgent: fingerprint.userAgent,
+        viewport: fingerprint.viewport,
+        locale: fingerprint.language,
+        timezoneId: fingerprint.timezone,
+        geolocation: fingerprint.geolocation,
+        permissions: ["geolocation", "notifications"],
+        extraHTTPHeaders: {
+          "Accept-Language": fingerprint.language,
+          Referer: fingerprint.referer,
+          DNT: Math.random() > 0.5 ? "1" : "0",
+          "Sec-Ch-Ua": '"Chromium";v="119", "Google Chrome";v="119"',
+          "Sec-Ch-Ua-Mobile": "?0",
+          "Sec-Ch-Ua-Platform": '"Windows"',
+        },
+        proxy: {
+          server: `http://${proxyConfig.server}`,
+          username: proxyConfig.username,
+          password: proxyConfig.password
+        },
+        ...(sessionData && { storageState: sessionData })
+      });
 
-      this.logger.info("[BrowserService] Connected to Brightdata browser, creating context");
+      // Add anti-detection scripts
+      await context.addInitScript(() => {
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters) =>
+          parameters.name === "notifications"
+            ? Promise.resolve({ state: Notification.permission })
+            : originalQuery(parameters);
 
-      // Create browser context with more detailed error handling
-      let context;
-      try {
-        context = await browser.newContext({
-          userAgent: this.browserConfig.USER_AGENTS[
-            Math.floor(Math.random() * this.browserConfig.USER_AGENTS.length)
-          ],
-          viewport: {
-            width: this.browserConfig.BROWSER_WIDTH,
-            height: this.browserConfig.BROWSER_HEIGHT
+        Object.defineProperties(navigator, {
+          webdriver: { get: () => undefined },
+          languages: { get: () => ["en-US", "en"] },
+          plugins: { get: () => [1, 2, 3, 4, 5] },
+          permissions: {
+            get: () => ({
+              query: async () => ({ state: "granted" }),
+            }),
           },
-          ...(sessionData && { storageState: sessionData }),
-          // Add additional options to help with detection
-          ignoreHTTPSErrors: true,
-          bypassCSP: true,
-          extraHTTPHeaders: {
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'sec-ch-ua': '"Google Chrome";v="119"',
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Windows"'
+        });
+
+        window.chrome = {
+          runtime: {},
+          app: {},
+          csi: () => {},
+          loadTimes: () => {},
+        };
+      });
+
+      const page = await wrap(await context.newPage());
+
+      // Modify the proxy verification to be more robust
+      let ipInfo = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          this.logger.info(`[BrowserService] Verifying proxy attempt ${attempt + 1}/3`);
+          
+          // Try a simple navigation first
+          await page.goto('https://api.ipify.org?format=json', {
+            waitUntil: 'networkidle',
+            timeout: 30000
+          });
+
+          ipInfo = await this.verifyProxy(page);
+          if (ipInfo) {
+            this.logger.info("[BrowserService] IP Royal proxy verified successfully:", ipInfo);
+            break;
           }
-        });
-      } catch (error) {
-        this.logger.error("[BrowserService] Failed to create browser context:", {
-          error: error.message,
-          stack: error.stack
-        });
-        await browser.close().catch(e => this.logger.error("Failed to close browser after context creation error:", e));
-        throw error;
-      }
 
-      this.logger.info("[BrowserService] Browser context created, creating new page");
-
-      // Create page with error handling
-      let page;
-      try {
-        page = await wrap(await context.newPage());
-      } catch (error) {
-        this.logger.error("[BrowserService] Failed to create new page:", {
-          error: error.message,
-          stack: error.stack
-        });
-        await context.close().catch(e => this.logger.error("Failed to close context after page creation error:", e));
-        await browser.close().catch(e => this.logger.error("Failed to close browser after page creation error:", e));
-        throw error;
-      }
-
-      // Test the connection with a simple navigation
-      try {
-        this.logger.info("[BrowserService] Testing Brightdata connection");
-        await page.goto('https://api.ipify.org?format=json', {
-          waitUntil: 'networkidle',
-          timeout: 30000
-        });
-        
-        const ipInfo = await this.verifyProxy(page);
-        if (!ipInfo) {
-          throw new Error("Failed to verify Brightdata connection");
+          await page.waitForTimeout(2000); // Wait before retry
+        } catch (error) {
+          this.logger.warn(`[BrowserService] Proxy verification attempt ${attempt + 1} failed:`, error);
+          if (attempt === 2) { // Last attempt
+            throw error;
+          }
+          await page.waitForTimeout(2000); // Wait before retry
         }
-        
-        this.logger.info("[BrowserService] Brightdata connection test successful", { ipInfo });
-      } catch (error) {
-        this.logger.error("[BrowserService] Brightdata connection test failed:", {
-          error: error.message,
-          stack: error.stack
-        });
-        await page.close().catch(e => this.logger.error("Failed to close page after connection test error:", e));
-        await context.close().catch(e => this.logger.error("Failed to close context after connection test error:", e));
-        await browser.close().catch(e => this.logger.error("Failed to close browser after connection test error:", e));
-        throw error;
+      }
+
+      if (!ipInfo) {
+        this.logger.error("[BrowserService] IP Royal proxy verification failed after all attempts!");
+        await browser.close();
+        throw new Error("IP Royal proxy verification failed");
       }
 
       await this.simulateHumanBehavior(page);
 
-      return { browser, page };
+      return { browser, page, fingerprint };
     } catch (error) {
-      this.logger.error("[BrowserService] Brightdata browser creation failed:", {
+      this.logger.error("[BrowserService] IP Royal browser creation failed:", {
         error: error.message,
-        stack: error.stack,
-        config: {
-          ...this.config.BRIGHTDATA_CONFIG,
-          wsEndpoint: '[REDACTED]' // Don't log credentials
-        }
+        stack: error.stack
       });
-      throw new Error(`Failed to create Brightdata browser: ${error.message}`);
+      throw new Error(`Failed to create IP Royal browser: ${error.message}`);
     }
   }
 
-  validateBrightdataConfig() {
-    const config = this.config.BRIGHTDATA_CONFIG;
-    
-    if (!config) {
-      throw new Error("Brightdata configuration is missing");
-    }
-
-    if (!config.wsEndpoint) {
-      throw new Error("Brightdata websocket endpoint is missing");
-    }
-
-    if (!config.wsEndpoint.startsWith('wss://')) {
-      throw new Error("Invalid Brightdata websocket endpoint format");
-    }
-
-    // Basic format validation for the endpoint
-    const wsRegex = /^wss:\/\/brd-customer-[^:]+:[^@]+@brd\.superproxy\.io:\d+$/;
-    if (!wsRegex.test(config.wsEndpoint)) {
-      throw new Error("Invalid Brightdata websocket endpoint format");
-    }
-
-    return true;
-  }
 }
 
 module.exports = BrowserService;

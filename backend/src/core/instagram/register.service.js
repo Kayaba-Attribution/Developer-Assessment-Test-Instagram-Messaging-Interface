@@ -422,6 +422,9 @@ class RegisterService {
       throw new Error("Signup button is disabled - form validation failed");
     }
 
+    // wait 30 sec
+    await page.waitForTimeout(30000);
+
     // Click the button
     await this._attemptSignupClick(page, button);
 

@@ -9,16 +9,22 @@ const isDev = NODE_ENV === "development";
 const config = {
   development: {
     FAST_MODE: true,
-    BROWSER_MODE: "brightdata", 
+    BROWSER_MODE: "adspower",
     // 'adspower'
     // 'default'
     //'no-proxy'
-    // brightdata
+    // 'iproyal'
+
     ADS_POWER_USER: "kqhbqo5",
     OXYLABS_PROXY: {
       server: "http://pr.oxylabs.io:7777",
       username: process.env.OXYLABS_USERNAME,
       password: process.env.OXYLABS_PASSWORD,
+    },
+    IPROYAL_PROXY: {
+      server: "geo.iproyal.com:12321",
+      username: "wQY7eiXxbK6fArPI",
+      password: "Ms2VvidBLZLaiK7p_streaming-1"
     },
     logLevel: "debug",
     headless: false,
@@ -49,9 +55,7 @@ const config = {
       maxSize: "20m",
       maxFiles: 5,
     },
-    BRIGHTDATA_CONFIG: {
-      wsEndpoint: "wss://brd-customer-hl_17de491b-zone-scraping_browser1:ss2fhm65x9v0@brd.superproxy.io:9222"
-    },
+ 
   },
   production: {
     BROWSER_MODE: "default",
@@ -75,8 +79,11 @@ const config = {
       maxSize: "50m",
       maxFiles: 10,
     },
-    BRIGHTDATA_CONFIG: {
-      wsEndpoint: "wss://brd-customer-hl_17de491b-zone-scraping_browser1:ss2fhm65x9v0@brd.superproxy.io:9222"
+
+    IPROYAL_PROXY: {
+      server: "geo.iproyal.com:12321",
+      username: "wQY7eiXxbK6fArPI",
+      password: "Ms2VvidBLZLaiK7p_streaming-1"
     },
   },
 }[NODE_ENV];
