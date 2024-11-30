@@ -8,6 +8,7 @@ import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Textarea } from "./ui/textarea";
 import { Card, CardContent } from "./ui/card";
+import { UnderConstructionAlert } from "./UnderConstructionAlert";
 
 interface FormState {
   username: string;
@@ -26,6 +27,11 @@ export function MessageForm() {
     message: "",
   });
   const [jsonInput, setJsonInput] = useState("");
+  const [showContent, setShowContent] = useState(false);
+
+  if (!showContent) {
+    return <UnderConstructionAlert onContinue={() => setShowContent(true)} />;
+  }
 
   const handleCombinedSubmit = async (data: FormState) => {
     setLoading(true);

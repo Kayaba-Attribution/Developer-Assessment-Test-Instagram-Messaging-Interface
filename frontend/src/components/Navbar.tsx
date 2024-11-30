@@ -1,7 +1,15 @@
 import { NavLink } from "react-router-dom";
 import { Button } from "./ui/button";
 import { useAuth } from "../context/AuthContext";
-import { MessageSquare, LayoutDashboard, LogOut, Menu, X } from "lucide-react";
+import {
+  MessageSquare,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  X,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { useState } from "react";
 
 export function Navbar() {
@@ -15,10 +23,37 @@ export function Navbar() {
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center">
               <span className="text-lg sm:text-xl font-bold text-gray-900 truncate">
-                MessageApp - JD
+                IG Storm - Postilize
               </span>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
+              <NavLink
+                to="/create-account"
+                className={({ isActive }) =>
+                  `inline-flex items-center px-4 py-2 text-sm font-medium ${
+                    isActive
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`
+                }
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Create Account
+              </NavLink>
+              <NavLink
+                to="/accounts"
+                className={({ isActive }) =>
+                  `inline-flex items-center px-4 py-2 text-sm font-medium ${
+                    isActive
+                      ? "text-blue-600 border-b-2 border-blue-600"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`
+                }
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Manage Accounts
+              </NavLink>
+
               <NavLink
                 to="/messages"
                 className={({ isActive }) =>
@@ -98,6 +133,38 @@ export function Navbar() {
                 <div className="flex items-center">
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Messages
+                </div>
+              </NavLink>
+              <NavLink
+                to="/create-account"
+                className={({ isActive }) =>
+                  `block px-3 py-2 rounded-md text-base font-medium ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-gray-500 hover:bg-gray-50"
+                  }`
+                }
+                onClick={() => setIsOpen(false)}
+              >
+                <div className="flex items-center">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Create Account
+                </div>
+              </NavLink>
+              <NavLink
+                to="/accounts"
+                className={({ isActive }) =>
+                  `block px-3 py-2 rounded-md text-base font-medium ${
+                    isActive
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-gray-500 hover:bg-gray-50"
+                  }`
+                }
+                onClick={() => setIsOpen(false)}
+              >
+                <div className="flex items-center">
+                  <Users className="w-4 h-4 mr-2" />
+                  Manage Accounts
                 </div>
               </NavLink>
               <NavLink

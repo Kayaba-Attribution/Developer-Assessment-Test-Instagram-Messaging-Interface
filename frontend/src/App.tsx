@@ -35,7 +35,7 @@ export function App() {
                     <Route path="/accounts" element={<AccountManagement />} />
                     <Route
                       path="/"
-                      element={<Navigate to="/messages" replace />}
+                      element={<Navigate to="/create-account" replace />}
                     />
                   </Routes>
                 </ProtectedRoute>

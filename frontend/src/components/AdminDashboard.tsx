@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { RefreshCcw } from "lucide-react";
 import type { Message } from "../lib/types";
+import { UnderConstructionAlert } from "./UnderConstructionAlert";
 
 export function AdminDashboard() {
   const { username } = useAuth();
@@ -26,6 +27,7 @@ export function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<"all" | "sent" | "failed">(
     "all"
   );
+  const [showContent, setShowContent] = useState(false);
 
   const fetchMessages = async (targetUser: string) => {
     if (!targetUser) return;
@@ -70,6 +72,10 @@ export function AdminDashboard() {
     );
     setFilteredMessages(filtered);
   }, [allMessages, searchTerm, statusFilter]);
+
+  if (!showContent) {
+    return <UnderConstructionAlert onContinue={() => setShowContent(true)} />;
+  }
 
   return (
     <div className="p-4 md:p-8 md:mx-64">

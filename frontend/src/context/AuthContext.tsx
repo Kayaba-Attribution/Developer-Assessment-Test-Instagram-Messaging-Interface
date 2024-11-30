@@ -24,6 +24,7 @@ interface AuthContextType {
   isLoading: boolean;
   loginWithGoogle: () => void;
   logout: () => Promise<void>;
+  username: string | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -76,7 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: state.user, 
       isLoading: state.isLoading,
       loginWithGoogle,
-      logout 
+      logout,
+      username: state.user ? state.user.name : null
     }}>
       {children}
     </AuthContext.Provider>
